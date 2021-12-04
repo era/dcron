@@ -39,7 +39,7 @@ Leader node to worker
 ###### Request message
 - job id
 - script type
-- scripit location
+- script location
 ###### Response message
 - Accepted status (declined/accepted)
 
