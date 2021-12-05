@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+
+option go_package = "github.com/era/dcron/services/dcron";
+
+
+package dcron;
+
+
+import "google/protobuf/timestamp.proto";
+
+// Needs better name
+service Public {
+  rpc NewJob (JobRequest) returns (JobResponse) {}
+  rpc GetJob (JobStatusRequest) returns (JobStatusResponse) {}
+}
+
+service Internal {
+  rpc ExecuteJob(ExecutionJobRequest) returns (ExecutionJobResponse) {}
+}
+
+message JobRequest {
+  string time = 1;
+  string type = 2; // maybe better to use an enum here
+  string location = 3;
+}
+
+message JobResponse {
+  string identifier = 1;
+  int32 error_code = 2;
+}
+
+message JobStatusRequest {
+  string identifier = 1;
+}
+
+message Execution {
+  google.protobuf.Timestamp executed_at = 1;
+  string log = 2;
+  int32 exit_code = 3;
+}
+
+message JobStatusResponse {
+  int32 error_code = 1;
+  string type = 2;
+  string location = 3;
+  repeated Execution executions = 4;
+}
+
+message ExecutionJobRequest {}
+
+message ExecutionJobResponse {}
