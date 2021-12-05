@@ -35,14 +35,15 @@ Exactly like create, but request message has a field for the job id.
 ### Communication between leader and workers
 The distributed system has an active (leader) node, which is responsible for polling the database every minute. When there is a new job to be executed, it sends to a node (for now based on round-robin). If the worker is busy, it can refuse to execute the job.
 
-There is no need for the worker to communicate back the result of the job*, it just need to update the DocumentDB. The job must have a timeout, in which case, the leader will retry the job again in another node.
+There is no need for the worker to communicate back the result of the job*, it just need to update the DocumentDB. The job must can a timeout, in which case, the leader will retry the job again in another node. If the job does not have a timeout set, the leader will wait forever for the execution to finish (failing or succeeding) and may need manual intervention.
 
-* not sure about it, need to think better on edge cases regarding timeouts.
+*not sure about it, need to think better on edge cases regarding timeouts.
 
 ##### API: EXECUTE JOB
 Leader node to worker
 ###### Request message
 - job id
+- Timeout in minutes
 - script type
 - script location
 ###### Response message
