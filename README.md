@@ -51,3 +51,11 @@ Worker to leader node
 - Job id
 - Log path
 - exit status code
+
+## Implementation Details
+
+### Leader election
+
+In order to elect a leader we need to archivie consensus. Paxos is normally my goto tool, but I read about https://raft.github.io/ and I want to try it out.
+
+
