@@ -58,4 +58,12 @@ Worker to leader node
 
 In order to elect a leader we need to archivie consensus. Paxos is normally my goto tool, but I read about https://raft.github.io/ and I want to try it out.
 
+### Web Interface
+
+The web interface will have very few features, it can see the jobs, their executions, and logs. It won't be possible for now to change any data about the job itself. The idea is that most of the configuration should be done always using the client. In the future the idea is to have a way to template the jobs, similar to Terraform.
+
+
+### Language
+
+I'm still not sure if I will go with Go or Rust. I plan to use gRPC for the communication between computers, and it seems like there is not great support for gRPC in the Rust community (may be wrong). Go would be fine for the service, given that there's no heavy CPU bound operation. Running the scripts itself should be a task for the OS.
 
