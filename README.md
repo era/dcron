@@ -4,6 +4,8 @@
 The idea for this project is to create an easy way to create cron-like jobs without having to worry about *where* the script will run. For this to happen a client should be able to talk with any server to schedule a job or retrieve a job result/log. In order to keep the logs accessible by a web-interface, once the job is done 
 the log will be uploaded to a object storage service (such as S3, ceph or openstack Swift). The client will also upload the script it wants to run in a object storage service and only give to the server the time it wants it to run (using cron-syntax) and the intepreter the server should use to run it.
 
+If the job is set for every 5 minutes and one execution is taking more than that, the next execution will be delayed until the job is finished.
+
 The service itself uses a DocumentDB such as https://couchdb.apache.org/ to store its data.
 
 ## API
