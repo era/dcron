@@ -35,7 +35,9 @@ Exactly like create, but request message has a field for the job id.
 ### Communication between leader and workers
 The distributed system has an active (leader) node, which is responsible for polling the database every minute. When there is a new job to be executed, it sends to a node (for now based on round-robin). If the worker is busy, it can refuse to execute the job.
 
-There is no need for the worker to communicate the result of the job, it just need to update the DocumentDB. The job must have a timeout, in which case, the leader will retry the job again in another node.
+There is no need for the worker to communicate back the result of the job*, it just need to update the DocumentDB. The job must have a timeout, in which case, the leader will retry the job again in another node.
+
+* not sure about it, need to think better on edge cases regarding timeouts.
 
 ##### API: EXECUTE JOB
 Leader node to worker
@@ -46,7 +48,6 @@ Leader node to worker
 ###### Response message
 - Accepted status (declined/accepted)
 
-![image](https://user-images.githubusercontent.com/266034/144726349-b2335169-e460-4044-bbcb-83cab267bc2f.png)
 
 ##### API: SAVE JOB STATUS
 Worker to leader node
@@ -60,6 +61,10 @@ Worker to leader node
 ### Leader election
 
 In order to elect a leader we need to archivie consensus. Paxos is normally my goto tool, but I read about https://raft.github.io/ and I want to try it out.
+
+The leader is only need to coordinate which machine is going to run which job. The machines can talk directly to the documentDB to save result of jobs and to insert new jobs.
+
+The Execution document at the Database is append-only, meaning that if due to timeout two machines execute the same job, both executions will be kept at the database.
 
 ### Web Interface
 
