@@ -34,6 +34,9 @@ Exactly like create, but request message has a field for the job id.
 
 ### Communication between leader and workers
 The distributed system has an active (leader) node, which is responsible for polling the database every minute. When there is a new job to be executed, it sends to a node (for now based on round-robin). If the worker is busy, it can refuse to execute the job.
+
+There is no need for the worker to communicate the result of the job, it just need to update the DocumentDB. The job must have a timeout, in which case, the leader will retry the job again in another node.
+
 ##### API: EXECUTE JOB
 Leader node to worker
 ###### Request message
