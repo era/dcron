@@ -100,4 +100,6 @@ I'm still not sure if I will go with Go or Rust. I plan to use gRPC for the comm
 IMHO it's much easier to keep a Rust project healthy, since it's harder to write good Go code (given the lack of compiler support and lack of strategies to handle errors). On the other hand, it's very hard to write a PoC in Rust, since the compiler wants us to write code that works at production level right away.
 
 
+### Libre Software
 
+This will be a Free Software as defined by the Free Software Foundation: https://www.gnu.org/philosophy/free-sw.html
