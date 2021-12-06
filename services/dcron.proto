@@ -19,25 +19,44 @@ service Internal {
   rpc ExecuteJob(ExecutionJobRequest) returns (ExecutionJobResponse) {}
 }
 
+enum ScriptType {
+  PYTHON = 0;
+  RUBY = 1;
+}
+
 message JobRequest {
   string time = 1;
-  string type = 2; // maybe better to use an enum here
+  ScriptType type = 2;
   string location = 3;
+  string name = 4;
+  int32 timeout = 5;
+  bool update_if_exists = 6; 
+  
 }
 
 message JobResponse {
-  string identifier = 1;
+  string name = 1;
   int32 error_code = 2;
+  string error_message = 3;
 }
 
 message JobStatusRequest {
-  string identifier = 1;
+  string name = 1;
+}
+
+enum ExecutionStatus {
+  RUNNING = 0;
+  TIMEOUT = 1;
+  FAILED = 2;
+  SUCCEEDED = 3;
 }
 
 message Execution {
   google.protobuf.Timestamp executed_at = 1;
   string log = 2;
   int32 exit_code = 3;
+  ExecutionStatus status = 4;
+  
 }
 
 message JobStatusResponse {
@@ -47,6 +66,18 @@ message JobStatusResponse {
   repeated Execution executions = 4;
 }
 
-message ExecutionJobRequest {}
+message ExecutionJobRequest {
+  ScriptType type = 1;
+  string location = 2;
+  string name = 3;
+  int32 timeout = 4;
+}
 
-message ExecutionJobResponse {}
+enum ExecutionJobAck {
+  ACCEPTED = 0;
+  REJECTED = 1;
+}
+
+message ExecutionJobResponse {
+  ExecutionJobAck status = 1;
+}
