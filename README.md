@@ -8,26 +8,42 @@ If the job is set for every 5 minutes and one execution is taking more than that
 
 The service itself uses a DocumentDB such as https://couchdb.apache.org/ to store its data.
 
+The service assumes the client is trustworth, so there won't be any complex check regarding the safety of scripts.
+
+The service always look 5 minutes backward in order to schedule services. If the service crashes for a long period, it won't try to run all the jobs from that period.
+
 ## API
 
 ### Communication between client and server
 #### API: CREATE JOB
+
+The user defines the job name, if the job name is already taken an error is returned.
+
 ##### Request message
+- name: Job name
 - time: cron job syntax to define the frequency and time of execution
 - script type: python or ruby
 - script_location: object storage service url/id
+- update: boolean flag, True = if there is a job with this name, update it.
 ##### Response message
-- job id
+- success message/errorcode
 
 ![image](https://user-images.githubusercontent.com/266034/144726107-04c863f3-28c0-402a-8e24-fd6147de3db7.png)
 
-#### API: UPDATE JOB
 
-Exactly like create, but request message has a field for the job id.
+#### API: DISABLE JOB EXECUTIONS
+
+Jobs cannot be deleted, they can be disable if needed.
+
+##### Request message
+- name: Job name
+
+#### Response message
+- success / error code
 
 #### API: GET JOB EXECUTIONS
 ##### Request message
-- Job id
+- Job name
 ##### Response Message:
 - Array of execution object:
     -  Execution date
@@ -35,6 +51,7 @@ Exactly like create, but request message has a field for the job id.
     -  Logs path
 
 ### Communication between leader and workers
+
 The distributed system has an active (leader) node, which is responsible for polling the database every minute. When there is a new job to be executed, it sends to a node (for now based on round-robin). If the worker is busy, it can refuse to execute the job.
 
 There is no need for the worker to communicate back the result of the job*, it just need to update the DocumentDB. The job can have a timeout, in which case, the leader will retry the job again in another node after the timeout. If the job does not have a timeout set, the leader will wait forever for the execution to finish (failing or succeeding) and may need manual intervention.
@@ -69,6 +86,8 @@ The leader is only need to coordinate which machine is going to run which job. T
 
 The Execution document at the Database is append-only, meaning that if due to timeout two machines execute the same job, both executions will be kept at the database.
 
+Timeouts can be set to zero, meaning the service won't retry the job until the executions finishes. You still should always write your scripts keeping in mind two jobs can run in paralell (in case of network split).
+
 ### Web Interface
 
 The web interface will have very few features, it can see the jobs, their executions, and logs. It won't be possible for now to change any data about the job itself. The idea is that most of the configuration should be done always using the client. In the future the idea is to have a way to template the jobs, similar to Terraform.
@@ -77,4 +96,8 @@ The web interface will have very few features, it can see the jobs, their execut
 ### Language
 
 I'm still not sure if I will go with Go or Rust. I plan to use gRPC for the communication between computers, and it seems like there is not great support for gRPC in the Rust community (may be wrong). Go would be fine for the service, given that there's no heavy CPU bound operation. Running the scripts itself should be a task for the OS.
+
+IMHO it's much easier to keep a Rust project healthy, since it's harder to write good Go code (given the lack of compiler support and lack of strategies to handle errors). On the other hand, it's very hard to write a PoC in Rust, since the compiler wants us to write code that works at production level right away.
+
+
 
