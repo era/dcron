@@ -95,7 +95,7 @@ The web interface will have very few features, it can see the jobs, their execut
 
 ### Language
 
-I'm still not sure if I will go with Go or Rust. I plan to use gRPC for the communication between computers, and it seems like there is not great support for gRPC in the Rust community (may be wrong). Go would be fine for the service, given that there's no heavy CPU bound operation. Running the scripts itself should be a task for the OS.
+I'm still not sure if I will go with Go or Rust. I plan to use gRPC for the communication between computers, ~~and it seems like there is not great support for gRPC in the Rust community (may be wrong)~~ (tonic: https://github.com/hyperium/tonic/blob/master/examples/helloworld-tutorial.md ). Go would be fine for the service, given that there's no heavy CPU bound operation. Running the scripts itself should be a task for the OS.
 
 IMHO it's much easier to keep a Rust project healthy, since it's harder to write good Go code (given the lack of compiler support and lack of strategies to handle errors). On the other hand, it's very hard to write a PoC in Rust, since the compiler wants us to write code that works at production level right away.
 
