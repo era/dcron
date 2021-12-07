@@ -6,7 +6,7 @@ pub struct Job {
     pub time: String,
     pub job_type: String,
     pub script: String,
-    pub timeout: u64,
+    pub timeout: i32,
     pub active: bool,
 }
 

@@ -61,8 +61,13 @@ impl DB {
             return Err("Job already in database".into());
         } else {
             if let Some(database) = self.get_db() {
-                let collection = database.collection::<job::Job>("jobs");
-                // collection.insert_one(doc! { job }, None).await?;
+                let collection = database.collection("jobs");
+                collection
+                    .insert_one(
+                        doc! { "name": &job.name, "script_type": &job.script, "script": &job.script, "time": &job.time, "timeout": &job.timeout  },
+                        None,
+                    )
+                    .await?;
 
                 return Ok(());
             }
