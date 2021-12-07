@@ -7,8 +7,6 @@ option go_package = "github.com/era/dcron/services/dcron";
 package dcron;
 
 
-import "google/protobuf/timestamp.proto";
-
 // Needs better name
 service Public {
   rpc NewJob (JobRequest) returns (JobResponse) {}
@@ -26,7 +24,7 @@ enum ScriptType {
 
 message JobRequest {
   string time = 1;
-  ScriptType type = 2;
+  ScriptType job_type = 2;
   string location = 3;
   string name = 4;
   int32 timeout = 5;
@@ -52,7 +50,7 @@ enum ExecutionStatus {
 }
 
 message Execution {
-  google.protobuf.Timestamp executed_at = 1;
+  uint64 executed_at = 1;
   string log = 2;
   int32 exit_code = 3;
   ExecutionStatus status = 4;
@@ -61,13 +59,13 @@ message Execution {
 
 message JobStatusResponse {
   int32 error_code = 1;
-  string type = 2;
+  ScriptType job_type = 2;
   string location = 3;
   repeated Execution executions = 4;
 }
 
 message ExecutionJobRequest {
-  ScriptType type = 1;
+  ScriptType job_type = 1;
   string location = 2;
   string name = 3;
   int32 timeout = 4;
