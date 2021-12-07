@@ -1,7 +1,8 @@
 use dcron::public_server::{Public, PublicServer};
 use dcron::{JobRequest, JobResponse, JobStatusRequest, JobStatusResponse, ScriptType};
 use tonic::{transport::Server, Request, Response, Status};
-
+mod db;
+mod job;
 pub mod dcron {
     tonic::include_proto!("dcron"); // The string specified here must match the proto package name
 }
