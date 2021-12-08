@@ -1,7 +1,9 @@
 use db::DB;
 use dcron::public_server::{Public, PublicServer};
 use dcron::{JobRequest, JobResponse, JobStatusRequest, JobStatusResponse, ScriptType};
+use std::env;
 use tonic::{transport::Server, Code, Request, Response, Status};
+mod config;
 mod db;
 mod job;
 pub mod dcron {
@@ -71,8 +73,38 @@ impl Public for DcronBasicServer {
     }
 }
 
-async fn get_db() -> Result<DB, Box<dyn std::error::Error>> {
-    DB::connect("username", "password", "cluster_url").await
+async fn get_db() -> Result<DB, anyhow::Error> {
+    // TODO: Should keep a pool of connections
+    // TODO: TRansfer the config things to a sync method
+    let config_file = match env::var("DCRON_CONFIG") {
+        Ok(config_file) => config_file,
+        _ => "app.toml".into(),
+    };
+
+    let mut config = config::Config::from(&config_file);
+
+    let config = match config {
+        Ok(config) => config,
+        _ => panic!("Error while trying to read configuration file"),
+    };
+
+    if let Some(db_config) = config.database {
+        let url = DB::connection_url(
+            &db_config.username,
+            &db_config.password,
+            &db_config.cluster_url,
+        );
+
+        let result = tokio::task::spawn_blocking(|| DB::connect(url)).await;
+    } else {
+        let result = tokio::task::spawn_blocking(|| DB::local_connection()).await;
+    }
+
+    if let Ok(connection) = result {
+        return Ok(connection);
+    } else {
+        return anyhow::Error("Could not connect to the database");
+    }
 }
 
 #[tokio::main]

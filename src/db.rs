@@ -12,17 +12,14 @@ pub struct DB {
 }
 
 impl DB {
-    pub async fn connect(
-        username: &str,
-        password: &str,
-        cluster_url: &str,
-    ) -> Result<DB, Box<dyn std::error::Error>> {
-        let url = format!(
+    pub fn connection_url(username: &str, password: &str, cluster_url: &str) -> String {
+        format!(
             "mongodb+srv://{}:{}@{}/dcron?w=majority",
             username, password, cluster_url
-        );
-
-        let mut client_options = ClientOptions::parse(url).await?;
+        )
+    }
+    pub async fn connect(url: String) -> Result<DB, Box<dyn std::error::Error>> {
+        let client_options = ClientOptions::parse(url).await?;
 
         let client = Client::with_options(client_options)?;
         client
@@ -33,6 +30,10 @@ impl DB {
         Ok(DB {
             client: Some(DBClient::MongoDB(client)),
         })
+    }
+
+    pub async fn local_connection() -> Result<DB, Box<dyn std::error::Error>> {
+        DB::connect("mongodb://localhost:27017/dcron".into()).await
     }
 
     fn get_db(self: &Self) -> Option<Database> {
