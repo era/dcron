@@ -56,8 +56,8 @@ impl DB {
         None
     }
 
-    pub async fn insert_if_not_exists(self: &Self, job: job::Job) -> Result<(), Box<dyn Error>> {
-        if let Some(job) = self.find_job(&job.name).await {
+    pub async fn insert_if_not_exists(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>> {
+        if let Some(_job) = self.find_job(&job.name).await {
             return Err("Job already in database".into());
         } else {
             if let Some(database) = self.get_db() {

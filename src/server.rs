@@ -1,6 +1,7 @@
+use db::DB;
 use dcron::public_server::{Public, PublicServer};
 use dcron::{JobRequest, JobResponse, JobStatusRequest, JobStatusResponse, ScriptType};
-use tonic::{transport::Server, Request, Response, Status};
+use tonic::{transport::Server, Code, Request, Response, Status};
 mod db;
 mod job;
 pub mod dcron {
@@ -13,10 +14,43 @@ pub struct DcronBasicServer {}
 #[tonic::async_trait]
 impl Public for DcronBasicServer {
     async fn new_job(&self, request: Request<JobRequest>) -> Result<Response<JobResponse>, Status> {
+        let request = request.into_inner();
+        let job = job::Job {
+            name: request.name,
+            time: request.time,
+            job_type: request.job_type,
+            timeout: request.timeout,
+            script: request.location,
+            active: true,
+        };
+
+        let db = match get_db().await {
+            Ok(db) => db,
+            _ => {
+                return Err(Status::new(
+                    Code::Internal,
+                    "Could not connect to the database",
+                ))
+            }
+        };
+
+        // should check if it should update or insert
+        // for now let's just insert
+
+        let result = db.insert_if_not_exists(&job).await;
+
+        if let Err(error) = result {
+            println!("{:?}", error);
+            return Err(Status::new(
+                Code::Internal,
+                "Error while trying to save object",
+            ));
+        }
+
         let reply = dcron::JobResponse {
-            name: "test".to_string(),
+            name: job.name.into(),
             error_code: 0,
-            error_message: "".to_string(),
+            error_message: "".into(),
         };
 
         Ok(Response::new(reply))
@@ -35,6 +69,10 @@ impl Public for DcronBasicServer {
 
         Ok(Response::new(reply))
     }
+}
+
+async fn get_db() -> Result<DB, Box<dyn std::error::Error>> {
+    DB::connect("username", "password", "cluster_url").await
 }
 
 #[tokio::main]

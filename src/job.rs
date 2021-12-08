@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct Job {
     pub name: String,
     pub time: String,
-    pub job_type: String,
+    pub job_type: i32,
     pub script: String,
     pub timeout: i32,
     pub active: bool,
