@@ -7,6 +7,7 @@ use tonic::{transport::Server, Code, Request, Response, Status};
 mod config;
 mod db;
 mod job;
+mod storage;
 pub mod dcron {
     tonic::include_proto!("dcron"); // The string specified here must match the proto package name
 }
