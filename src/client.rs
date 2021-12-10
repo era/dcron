@@ -2,6 +2,10 @@ extern crate clap;
 use clap::{App, Arg, SubCommand};
 use dcron::public_client::PublicClient;
 use dcron::JobRequest;
+use std::path::Path;
+use std::str::FromStr;
+
+mod storage;
 
 pub mod dcron {
     tonic::include_proto!("dcron");
@@ -9,6 +13,7 @@ pub mod dcron {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    //TODO subcommand for creating/updating and for disabling job
     let matches = App::new("dcron_client")
         .version("0.0.1")
         .author("Elias Granja <me@elias.sh>")
@@ -47,8 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .short("e")
                 .long("update")
                 .takes_value(false)
-                .index(4)
-                .required(true),
+                .index(4),
         )
         .arg(
             Arg::with_name("script")
@@ -58,17 +62,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .index(5)
                 .required(true),
         )
+        .arg(
+            Arg::with_name("name")
+                .short("n")
+                .long("name")
+                .takes_value(true)
+                .index(6)
+                .required(true),
+        )
         .get_matches();
+
+    let file = Path::new(matches.value_of("script").unwrap());
+    upload_file(&file).await?;
 
     let mut client = PublicClient::connect("http://[::1]:50051").await?; //TODO: change with ENV variables
 
+    //TODO: upload file
+
     let request = tonic::Request::new(JobRequest {
-        //TODO get this from clap
-        name: "Tonic".into(),
-        time: "* * * * 1".into(),
-        location: "service.py".into(),
-        timeout: 0,
-        update_if_exists: true,
+        name: matches.value_of("name").unwrap().into(),
+        time: matches.value_of("time").unwrap().into(),
+        location: file.file_name().unwrap().to_str().unwrap().to_owned(), //TODO omg, so terrible
+        timeout: <i32 as FromStr>::from_str(matches.value_of("timeout").unwrap()).unwrap(),
+        update_if_exists: matches.is_present("update"),
         job_type: 0,
     });
 
@@ -76,5 +92,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("RESPONSE={:?}", response);
 
+    Ok(())
+}
+
+async fn upload_file(path: &Path) -> Result<(), anyhow::Error> {
+    storage::Client::connect()
+        .put(
+            path.to_str().unwrap(),
+            path.file_name().unwrap().to_str().unwrap(), // :C
+        )
+        .await?;
     Ok(())
 }
