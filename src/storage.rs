@@ -1,9 +1,9 @@
+use crate::config::Minio;
 use anyhow;
 use s3::bucket::Bucket;
 use s3::creds::Credentials;
 use s3::region::Region;
 use std::fs;
-
 pub struct Storage {
     name: String,
     region: Region,
@@ -17,16 +17,16 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn connect() -> Client {
+    pub fn connect(minio_config: &Minio) -> Client {
         let minio = Storage {
             name: "minio".into(),
             region: Region::Custom {
                 region: "".into(),
-                endpoint: "http://127.0.0.1:9001".into(),
+                endpoint: (&minio_config.host).to_owned(),
             },
             credentials: Credentials {
-                access_key: Some("ACCESS_KEY".to_owned()),
-                secret_key: Some("SECRET_KEY".to_owned()),
+                access_key: Some((&minio_config.username).to_owned()),
+                secret_key: Some((&minio_config.password).to_owned()),
                 security_token: None,
                 session_token: None,
             },
@@ -43,10 +43,14 @@ impl Client {
             .bucket()?
             .put_object(object_name, content.as_bytes())
             .await?;
-        println!("{:?}", code);
-        //TODO if code != 200 throw an error
 
-        Ok(())
+        match code {
+            200 => Ok(()),
+            _ => Err(anyhow::anyhow!(format!(
+                "Error while uploading file, http code = {}",
+                code
+            ))),
+        }
     }
 
     fn bucket(self: Self) -> Result<Bucket, anyhow::Error> {
