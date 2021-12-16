@@ -57,21 +57,25 @@ impl DB {
         None
     }
 
-    pub async fn insert_if_not_exists(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>> {
+    pub async fn insert_if_not_exist(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>> {
         if let Some(_job) = self.find_job(&job.name).await {
-            return Err("Job already in database".into());
+            Err("Job already in database".into())
         } else {
-            if let Some(database) = self.get_db() {
-                let collection = database.collection("jobs");
-                collection
+            self.insert(job).await
+        }
+    }
+
+    pub async fn insert(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>> {
+        if let Some(database) = self.get_db() {
+            let collection = database.collection("jobs");
+            collection
                     .insert_one(
                         doc! { "name": &job.name, "script_type": &job.script, "script": &job.script, "time": &job.time, "timeout": &job.timeout  },
                         None,
                     )
                     .await?;
 
-                return Ok(());
-            }
+            return Ok(());
         }
         Err("Unknown error while saving the Job".into())
     }

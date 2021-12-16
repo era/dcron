@@ -43,7 +43,7 @@ impl Public for DcronBasicServer {
         // should check if it should update or insert
         // for now let's just insert
 
-        let result = db.insert_if_not_exists(&job).await;
+        let result = db.insert_if_not_exist(&job).await;
 
         if let Err(error) = result {
             println!("{:?}", error);
