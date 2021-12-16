@@ -1,9 +1,11 @@
 use crate::config::Minio;
 use anyhow;
+use chrono;
 use s3::bucket::Bucket;
 use s3::creds::Credentials;
 use s3::region::Region;
 use std::fs;
+
 pub struct Storage {
     name: String,
     region: Region,
@@ -15,7 +17,6 @@ pub struct Storage {
 pub struct Client {
     pub storage: Storage,
 }
-
 impl Client {
     pub fn connect(minio_config: &Minio) -> Client {
         let minio = Storage {
@@ -37,15 +38,22 @@ impl Client {
         Client { storage: minio }
     }
 
-    pub async fn put(self: Self, file: &str, object_name: &str) -> Result<(), anyhow::Error> {
+    pub async fn put(self: Self, file: &str, object_name: &str) -> Result<String, anyhow::Error> {
+        let bucket = self.bucket()?;
+
+        let (_, code) = bucket.get_object(object_name).await?;
+
+        let name = match code {
+            200 => format!("{}_{}", chrono::offset::Utc::now().timestamp(), object_name).into(),
+            404 => object_name.into(),
+            _ => return Err(anyhow::anyhow!("Could not verify if file exists already")),
+        };
+
         let content = fs::read_to_string(file).unwrap(); //TODO DO NOT UNWRAP!!!!
-        let (_, code) = self
-            .bucket()?
-            .put_object(object_name, content.as_bytes())
-            .await?;
+        let (_, code) = bucket.put_object(&name, content.as_bytes()).await?;
 
         match code {
-            200 => Ok(()),
+            200 => Ok(name),
             _ => Err(anyhow::anyhow!(format!(
                 "Error while uploading file, http code = {}",
                 code

@@ -96,12 +96,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut client = PublicClient::connect("http://[::1]:50051").await?; //TODO: change with ENV variables
 
-    upload_file(file).await?;
+    let file = upload_file(file).await?;
 
     let request = tonic::Request::new(JobRequest {
         name: matches.value_of("name").unwrap().into(),
         time: matches.value_of("time").unwrap().into(),
-        location: file.file_name().unwrap().to_str().unwrap().to_owned(), //TODO omg, so terrible
+        location: file,
         timeout: <i32 as FromStr>::from_str(matches.value_of("timeout").unwrap()).unwrap(),
         update_if_exists: matches.is_present("update"),
         job_type: job_type(matches.value_of("type").unwrap()),
@@ -122,7 +122,7 @@ fn job_type(user_type: &str) -> i32 {
     }
 }
 
-async fn upload_file(path: &Path) -> Result<(), anyhow::Error> {
+async fn upload_file(path: &Path) -> Result<String, anyhow::Error> {
     let config = match CONFIG.get() {
         Some(config) => config,
         _ => return Err(anyhow::anyhow!("Could not get a config object")),
@@ -136,11 +136,7 @@ async fn upload_file(path: &Path) -> Result<(), anyhow::Error> {
     storage::Client::connect(&minio_config)
         .put(
             path.to_str().unwrap(),
-            path.file_name().unwrap().to_str().unwrap(), //TODO: the problem here is that two users may define different scripts with same name
-                                                         // names should be prefixed with something unique to avoid this
-                                                         // and we should verify if we are
-                                                         // coliding before pushing the file
+            path.file_name().unwrap().to_str().unwrap(),
         )
-        .await?;
-    Ok(())
+        .await
 }
