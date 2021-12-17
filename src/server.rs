@@ -40,8 +40,10 @@ impl Public for DcronBasicServer {
             }
         };
 
-        // should check if it should update or insert
-        // for now let's just insert
+        if request.update_if_exists {
+            // TODO HANDLE  THE ERROR
+            db.disable_if_exist(&job.name).await;
+        }
 
         let result = db.insert_if_not_exist(&job).await;
 

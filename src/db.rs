@@ -1,5 +1,9 @@
 use crate::job;
-use mongodb::{bson::doc, options::ClientOptions, Client, Database};
+use mongodb::{
+    bson::{doc, Document},
+    options::ClientOptions,
+    Client, Collection, Database,
+};
 
 use std::error::Error;
 
@@ -43,11 +47,13 @@ impl DB {
         None
     }
 
-    pub async fn find_job(self: &Self, name: &str) -> Option<job::Job> {
+    pub async fn find_job(self: &Self, name: &str, active: bool) -> Option<job::Job> {
         if let Some(database) = self.get_db() {
             let collection = database.collection::<job::Job>("jobs");
 
-            let job = collection.find_one(doc! { "name": name }, None).await;
+            let job = collection
+                .find_one(doc! { "name": name, "active": active }, None)
+                .await;
 
             match job {
                 Ok(Some(job)) => return Some(job),
@@ -57,15 +63,34 @@ impl DB {
         None
     }
 
+    pub async fn disable_if_exist(self: &Self, name: &str) -> Result<(), Box<dyn Error>> {
+        if let Some(database) = self.get_db() {
+            if let Some(_job) = self.find_job(name, true).await {
+                let collection: Collection<Document> = database.collection("jobs");
+                collection
+                    .update_one(
+                        doc! {"name": name, "active": true},
+                        doc! {"active": false},
+                        None,
+                    )
+                    .await?;
+                return Ok(());
+            }
+        } else {
+            return Err("Could not get the database object".into());
+        }
+        Ok(())
+    }
+
     pub async fn insert_if_not_exist(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>> {
-        if let Some(_job) = self.find_job(&job.name).await {
+        if let Some(_job) = self.find_job(&job.name, true).await {
             Err("Job already in database".into())
         } else {
             self.insert(job).await
         }
     }
 
-    pub async fn insert(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>> {
+    async fn insert(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>> {
         if let Some(database) = self.get_db() {
             let collection = database.collection("jobs");
             collection
