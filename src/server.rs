@@ -41,8 +41,13 @@ impl Public for DcronBasicServer {
         };
 
         if request.update_if_exists {
-            // TODO HANDLE  THE ERROR
-            db.disable_if_exist(&job.name).await;
+            match db.disable_if_exist(&job.name).await {
+                Err(error) => {
+                    print!("Erro while disabling job: {:?}", error);
+                    return Err(Status::new(Code::Internal, "Error while disabling old job"));
+                }
+                _ => (),
+            };
         }
 
         let result = db.insert_if_not_exist(&job).await;
