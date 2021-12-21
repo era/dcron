@@ -73,11 +73,38 @@ impl Public for DcronBasicServer {
         &self,
         request: Request<JobStatusRequest>,
     ) -> Result<Response<JobStatusResponse>, Status> {
+        let request = request.into_inner();
+
+        let db = match get_db().await {
+            Ok(db) => db,
+            _ => {
+                return Err(Status::new(
+                    Code::Internal,
+                    "Could not connect to the database",
+                ))
+            }
+        };
+
+        let job = db.find_job(&request.name, true).await;
+
+        let job = match job {
+            Some(job) => job,
+            _ => {
+                return Err(Status::new(
+                    Code::Internal,
+                    "Error while trying to get object",
+                ))
+            }
+        };
+
         let reply = dcron::JobStatusResponse {
+            name: job.name,
+            timeout: job.timeout,
+            time: job.time,
             error_code: 0,
-            job_type: 0, // how to ScriScriptType::Python.,
-            location: "".to_string(),
-            executions: vec![],
+            job_type: job.job_type,
+            location: job.script,
+            executions: vec![], //TODO
         };
 
         Ok(Response::new(reply))

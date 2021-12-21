@@ -61,7 +61,10 @@ message JobStatusResponse {
   int32 error_code = 1;
   ScriptType job_type = 2;
   string location = 3;
-  repeated Execution executions = 4;
+  string name = 4;
+  int32 timeout = 5;
+  string time = 6;
+  repeated Execution executions = 7;
 }
 
 message ExecutionJobRequest {
