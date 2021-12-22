@@ -1,6 +1,9 @@
 use db::DB;
 use dcron::public_server::{Public, PublicServer};
-use dcron::{JobRequest, JobResponse, JobStatusRequest, JobStatusResponse, ScriptType};
+use dcron::{
+    DisableJobRequest, DisableJobResponse, JobRequest, JobResponse, JobStatusRequest,
+    JobStatusResponse, ScriptType,
+};
 use once_cell::sync::OnceCell;
 use std::env;
 use tonic::{transport::Server, Code, Request, Response, Status};
@@ -89,6 +92,12 @@ impl Public for DcronBasicServer {
 
         let job = match job {
             Some(job) => job,
+            None => {
+                return Err(Status::new(
+                    Code::NotFound,
+                    "Error while trying to get object",
+                ))
+            }
             _ => {
                 return Err(Status::new(
                     Code::Internal,
@@ -108,6 +117,54 @@ impl Public for DcronBasicServer {
         };
 
         Ok(Response::new(reply))
+    }
+
+    async fn disable_job(
+        &self,
+        request: Request<DisableJobRequest>,
+    ) -> Result<Response<DisableJobResponse>, Status> {
+        let request = request.into_inner();
+
+        let db = match get_db().await {
+            Ok(db) => db,
+            _ => {
+                return Err(Status::new(
+                    Code::Internal,
+                    "Could not connect to the database",
+                ))
+            }
+        };
+
+        let job = db.find_job(&request.name, true).await;
+
+        let response = match job {
+            Some(_job) => db.disable_if_exist(&request.name),
+            None => {
+                return Err(Status::new(
+                    Code::NotFound,
+                    "Error while trying to get object",
+                ))
+            }
+            _ => {
+                return Err(Status::new(
+                    Code::Internal,
+                    "Error while trying to get object",
+                ))
+            }
+        };
+
+        let reply = DisableJobResponse {
+            error_code: 0,
+            error_message: "".into(),
+        };
+
+        match response.await {
+            Ok(_) => Ok(Response::new(reply)),
+            _ => Err(Status::new(
+                Code::Internal,
+                "Error while trying to update object",
+            )),
+        }
     }
 }
 

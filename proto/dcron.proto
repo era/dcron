@@ -11,6 +11,7 @@ package dcron;
 service Public {
   rpc NewJob (JobRequest) returns (JobResponse) {}
   rpc GetJob (JobStatusRequest) returns (JobStatusResponse) {}
+  rpc DisableJob(DisableJobRequest) returns (DisableJobResponse) {}
 }
 
 service Internal {
@@ -41,6 +42,17 @@ message JobResponse {
 message JobStatusRequest {
   string name = 1;
 }
+
+message DisableJobRequest {
+  string name = 1;
+}
+
+message DisableJobResponse {
+  int32 error_code = 1;
+  string error_message = 2;
+
+}
+
 
 enum ExecutionStatus {
   RUNNING = 0;
