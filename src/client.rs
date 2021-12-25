@@ -1,5 +1,5 @@
 extern crate clap;
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use dcron::public_client::PublicClient;
 use dcron::{JobRequest, ScriptType};
 use once_cell::sync::OnceCell;
@@ -95,26 +95,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .get_matches();
 
     if let Some(matches) = matches.subcommand_matches("create") {
-        let file = Path::new(matches.value_of("script").unwrap());
-        upload_file(&file).await?;
-
-        let mut client = PublicClient::connect("http://[::1]:50051").await?; //TODO: change with ENV variables
-
-        let file = upload_file(file).await?;
-
-        let request = tonic::Request::new(JobRequest {
-            name: matches.value_of("name").unwrap().into(),
-            time: matches.value_of("time").unwrap().into(),
-            location: file,
-            timeout: <i32 as FromStr>::from_str(matches.value_of("timeout").unwrap()).unwrap(),
-            update_if_exists: matches.is_present("update_if_exists"),
-            job_type: job_type(matches.value_of("type").unwrap()),
-        });
-
-        let response = client.new_job(request).await?;
-
-        println!("RESPONSE={:?}", response);
+        create_job(matches).await?;
     }
+    Ok(())
+}
+
+async fn create_job(matches: &ArgMatches<'_>) -> Result<(), Box<dyn std::error::Error>> {
+    let file = Path::new(matches.value_of("script").unwrap());
+
+    let mut client = PublicClient::connect("http://[::1]:50051"); //TODO: change with ENV variables
+
+    let file = upload_file(file).await?;
+
+    let request = tonic::Request::new(JobRequest {
+        name: matches.value_of("name").unwrap().into(),
+        time: matches.value_of("time").unwrap().into(),
+        location: file,
+        timeout: <i32 as FromStr>::from_str(matches.value_of("timeout").unwrap()).unwrap(),
+        update_if_exists: matches.is_present("update_if_exists"),
+        job_type: job_type(matches.value_of("type").unwrap()),
+    });
+
+    let response = client.await?.new_job(request).await?;
+
+    println!("RESPONSE={:?}", response);
+
     Ok(())
 }
 
