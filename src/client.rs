@@ -1,9 +1,10 @@
 extern crate clap;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use dcron::public_client::PublicClient;
-use dcron::{JobRequest, ScriptType};
+use dcron::{DisableJobRequest, JobRequest, ScriptType};
 use once_cell::sync::OnceCell;
 use std::env;
+use std::ops::Sub;
 use std::path::Path;
 use std::str::FromStr;
 
@@ -35,6 +36,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = App::new("dcron_client")
         .version("0.0.1")
         .author("Elias Granja <me@elias.sh>")
+        .subcommand(
+            SubCommand::with_name("disable").about("Disable a job").arg(
+                Arg::with_name("name")
+                    .short("n")
+                    .long("name")
+                    .takes_value(true)
+                    .index(1)
+                    .required(true),
+            ),
+        )
         .subcommand(
             SubCommand::with_name("create")
                 .about("Sets up a script to be run at a DCRON instance")
@@ -96,7 +107,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if let Some(matches) = matches.subcommand_matches("create") {
         create_job(matches).await?;
+    } else if let Some(matches) = matches.subcommand_matches("disable") {
+        disable_job(matches).await?;
     }
+
+    Ok(())
+}
+
+async fn disable_job(matches: &ArgMatches<'_>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut client = PublicClient::connect("http://[::1]:50051");
+    let request = tonic::Request::new(DisableJobRequest {
+        name: matches.value_of("name").unwrap().into(),
+    });
+
+    let response = client.await?.disable_job(request).await?;
+
+    println!("RESPONSE={:?}", response);
+
     Ok(())
 }
 
