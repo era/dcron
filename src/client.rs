@@ -15,7 +15,7 @@ pub mod dcron {
 }
 
 static CONFIG: OnceCell<config::Config> = OnceCell::new();
-
+// dcron-client create 1234 0 python test.py my_job
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_file = match env::var("DCRON_CONFIG") {
@@ -69,9 +69,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .arg(
                     //TODO not great that the name of the commannd is create but we have an update flag
-                    Arg::with_name("update")
+                    Arg::with_name("update_if_exists")
                         .short("e")
-                        .long("update")
+                        .long("update_if_exists")
                         .takes_value(false)
                         .index(6),
                 )
@@ -107,7 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             time: matches.value_of("time").unwrap().into(),
             location: file,
             timeout: <i32 as FromStr>::from_str(matches.value_of("timeout").unwrap()).unwrap(),
-            update_if_exists: matches.is_present("update"),
+            update_if_exists: matches.is_present("update_if_exists"),
             job_type: job_type(matches.value_of("type").unwrap()),
         });
 
