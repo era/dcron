@@ -50,7 +50,13 @@ pub fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Err
                     run_job(copy.to_string());
                 }),
             ));
+
+            (*scheduler)
+                .job_ids
+                .insert(job_name.to_string().clone(), job_id);
         }
+    } else {
+        return Err(anyhow::anyhow!("Could noto get write lock"));
     }
     return Ok(());
 }
