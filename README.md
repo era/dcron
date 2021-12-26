@@ -80,7 +80,7 @@ Worker to leader node
 
 ### Leader election
 
-In order to elect a leader we need to archivie consensus. Paxos is normally my goto tool, but I read about https://raft.github.io/ and I want to try it out.
+Consensus: https://raft.github.io/
 
 The leader is only need to coordinate which machine is going to run which job. The machines can talk directly to the documentDB to save result of jobs and to insert new jobs.
 
@@ -94,6 +94,7 @@ The web interface will have very few features, it can see the jobs, their execut
 
 
 ### Language
+RUST
 
 I'm still not sure if I will go with Go or Rust. I plan to use gRPC for the communication between computers, ~~and it seems like there is not great support for gRPC in the Rust community (may be wrong)~~ (tonic: https://github.com/hyperium/tonic/blob/master/examples/helloworld-tutorial.md ). Go would be fine for the service, given that there's no heavy CPU bound operation. Running the scripts itself should be a task for the OS.
 
