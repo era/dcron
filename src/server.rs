@@ -178,17 +178,8 @@ async fn get_db() -> Result<DB, Box<dyn std::error::Error>> {
         Some(config) => config,
         _ => return Err("Could not get a config object".into()),
     };
-    if let Some(db_config) = &config.database {
-        let url = DB::connection_url(
-            &db_config.username,
-            &db_config.password,
-            &db_config.cluster_url,
-        );
 
-        return DB::connect(url).await;
-    } else {
-        return DB::local_connection().await;
-    }
+    db::get_db(config).await
 }
 
 #[tokio::main]

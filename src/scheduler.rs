@@ -20,7 +20,20 @@ impl Scheduler {
     // Schedule the jobs using job_scheduler and keeps their uuid
     // when updating the jobs, we need to hold a write lock
     // the job thread should request read lock, and send the job to a worker
-    fn schedule_all(self: &Self) -> Result<(), anyhow::Error> {
+
+    pub fn new() -> Result<Scheduler, anyhow::Error> {
+        return Err(anyhow::anyhow!("Opss"));
+    }
+
+    pub fn schedule_all(mut self: &Self) -> Result<(), anyhow::Error> {
         return Ok(());
+    }
+
+    pub fn update_schedules(mut self: &Self) -> Result<(), anyhow::Error> {
+        return Ok(());
+    }
+
+    fn run_job(job: &Job) -> Result<(), anyhow::Error> {
+        Ok(())
     }
 }

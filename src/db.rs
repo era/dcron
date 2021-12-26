@@ -1,4 +1,4 @@
-use crate::job;
+use crate::{config::Config, job};
 use mongodb::{
     bson::{doc, Document},
     options::ClientOptions,
@@ -105,5 +105,19 @@ impl DB {
             return Ok(());
         }
         Err("Unknown error while saving the Job".into())
+    }
+}
+
+pub async fn get_db(config: &Config) -> Result<DB, Box<dyn std::error::Error>> {
+    if let Some(db_config) = &config.database {
+        let url = DB::connection_url(
+            &db_config.username,
+            &db_config.password,
+            &db_config.cluster_url,
+        );
+
+        return DB::connect(url).await;
+    } else {
+        return DB::local_connection().await;
     }
 }
