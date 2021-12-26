@@ -1,8 +1,13 @@
-use crate::{config::Config, db, job::Job};
+use crate::{
+    config::Config,
+    db,
+    job::{self, Job},
+};
 use std::collections::HashMap;
 // job_scheduler crate https://docs.rs/job_scheduler/1.2.1/job_scheduler/
 use anyhow;
-use job_scheduler;
+use job_scheduler::{self, Schedule};
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 
 // Maybe should use an Arc on the Scheduler itself
@@ -11,6 +16,7 @@ pub struct Scheduler {
     jobs: Arc<RwLock<HashMap<String, Job>>>,
     // Used to unschedule a job if needed
     job_ids: Arc<RwLock<HashMap<String, job_scheduler::Uuid>>>,
+
     // Used to request to the database only jobs created after it
     last_updated_at: i64,
 }
@@ -27,10 +33,29 @@ impl Scheduler {
         return Err(anyhow::anyhow!("Opss"));
     }
 
-    pub fn schedule_all(mut self: &Self) -> Result<(), anyhow::Error> {
+    pub fn schedule_all(self: Self) -> Result<(), anyhow::Error> {
         // Get read lock
         // Schedule all the jobs and setup jobs_id
         // meant to be run once when we start the scheduler
+        let mut sched = job_scheduler::JobScheduler::new(); //TODO add to ONCE_CELL
+
+        if let Ok(ids) = self.job_ids.write() {
+            if let Ok(jobs) = self.jobs.read() {
+                for (job_name, job) in &*jobs {
+                    let copy = (&job_name).clone();
+                    let job_time = &job.time;
+
+                    //TODO Finish figthing with lifetimes
+                    let job_id = sched.add(job_scheduler::Job::new(
+                        //job_time.to_string().clone().parse().unwrap(),
+                        "* * * * 1".parse().unwrap(),
+                        move || {
+                            run_job("name".to_string());
+                        },
+                    ));
+                }
+            }
+        }
         return Ok(());
     }
 
@@ -43,11 +68,11 @@ impl Scheduler {
         // schedule any new job
         return Ok(());
     }
+}
 
-    fn run_job(mut self: &Self, job: &Job) -> Result<(), anyhow::Error> {
-        // Acquires reader lock on job ids (not sure if we really need)
-        // If standalone runs the script
-        // Otherwise gets a worker IP and sends an execution request to it
-        Ok(())
-    }
+fn run_job(name: String) -> Result<(), anyhow::Error> {
+    // Acquires reader lock on job ids (not sure if we really need)
+    // If standalone runs the script
+    // Otherwise gets a worker IP and sends an execution request to it
+    Ok(())
 }
