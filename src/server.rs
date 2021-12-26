@@ -1,3 +1,4 @@
+use chrono::Utc;
 use db::DB;
 use dcron::public_server::{Public, PublicServer};
 use dcron::{
@@ -10,7 +11,9 @@ use tonic::{transport::Server, Code, Request, Response, Status};
 mod config;
 mod db;
 mod job;
+mod scheduler;
 mod storage;
+
 pub mod dcron {
     tonic::include_proto!("dcron"); // The string specified here must match the proto package name
 }
@@ -31,6 +34,7 @@ impl Public for DcronBasicServer {
             timeout: request.timeout,
             script: request.location,
             active: true,
+            updated_at: Utc::now().timestamp(),
         };
 
         let db = match get_db().await {

@@ -5,6 +5,7 @@ use mongodb::{
     Client, Collection, Database,
 };
 
+use chrono::Utc;
 use std::error::Error;
 
 pub enum DBClient {
@@ -70,7 +71,7 @@ impl DB {
                 collection
                     .update_one(
                         doc! {"name": name, "active": true},
-                        doc! {"active": false},
+                        doc! {"active": false, "updated_at": Utc::now().timestamp()},
                         None,
                     )
                     .await?;

@@ -8,11 +8,12 @@ pub struct Job {
     pub script: String,
     pub timeout: i32,
     pub active: bool,
+    pub updated_at: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Execution {
-    pub start_time: u64,
+    pub start_time: i64,
     pub log: String,
     pub status: Status,
 }
