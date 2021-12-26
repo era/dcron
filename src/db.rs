@@ -96,7 +96,8 @@ impl DB {
             let collection = database.collection("jobs");
             collection
                     .insert_one(
-                        doc! { "name": &job.name, "script_type": &job.script, "script": &job.script, "time": &job.time, "timeout": &job.timeout  },
+                        doc! { "name": &job.name, "script_type": &job.script, "script": &job.script, "time": &job.time, "timeout": &job.timeout,
+                        "updated_at": &job.updated_at},
                         None,
                     )
                     .await?;
