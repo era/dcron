@@ -3,7 +3,7 @@ use crate::{
     db,
     job::{self, Job},
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::RwLockWriteGuard};
 // job_scheduler crate https://docs.rs/job_scheduler/1.2.1/job_scheduler/
 use anyhow;
 use closure::closure;
@@ -35,25 +35,14 @@ pub async fn new() -> Result<(), anyhow::Error> {
 }
 
 pub fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> {
-    // Get read lock
+    // Get write lock
     // Schedule all the jobs and setup jobs_id
     // meant to be run once when we start the scheduler
     if let Ok(mut scheduler) = scheduler.write() {
         let jobs = (*scheduler).jobs.clone();
-        for (job_name, job) in jobs {
-            let job_time = &job.time;
+        for (_job_name, job) in jobs {
             let job = Arc::new(job.clone());
-
-            let job_id = (*scheduler).job_scheduler.add(job_scheduler::Job::new(
-                job_time.parse().unwrap(),
-                closure!(move job, || {
-                    run_job(&*job);
-                }),
-            ));
-
-            (*scheduler)
-                .job_ids
-                .insert(job_name.to_string().clone(), job_id);
+            schedule_job(job, &mut *scheduler)?;
         }
     } else {
         return Err(anyhow::anyhow!("Could not get write lock"));
@@ -61,14 +50,27 @@ pub fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Err
     return Ok(());
 }
 
-pub fn update_schedules(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> {
+fn schedule_job(job: Arc<Job>, scheduler: &mut Scheduler) -> Result<(), anyhow::Error> {
+    let job_name = (&*job).name.clone();
+    let job_id = scheduler.job_scheduler.add(job_scheduler::Job::new(
+        (&job.time).parse().unwrap(),
+        closure!(move job, || {
+            run_job(&*job);
+        }),
+    ));
+
+    scheduler.job_ids.insert(job_name, job_id);
+    Ok(())
+}
+
+pub fn update_schedules(scheduler: Arc<RwLock<Scheduler>>) -> ! {
     // main method
     // loop
     // every 5 minutes, goes to the database
     // Acquires writer lock and unschedule any job that is needed and deletes from job_ids
     // Acquires writer lock and updates jobs.
     // schedule any new job
-    return Ok(());
+    loop {}
 }
 
 fn run_job(job: &Job) -> Result<(), anyhow::Error> {
