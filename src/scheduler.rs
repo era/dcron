@@ -42,12 +42,12 @@ pub fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Err
         let jobs = (*scheduler).jobs.clone();
         for (job_name, job) in jobs {
             let job_time = &job.time;
-            let copy = Rc::new((&job_name).clone());
+            let job = Arc::new(job.clone());
 
             let job_id = (*scheduler).job_scheduler.add(job_scheduler::Job::new(
                 job_time.parse().unwrap(),
-                closure!(clone copy, || {
-                    run_job(copy.to_string());
+                closure!(move job, || {
+                    run_job(&*job);
                 }),
             ));
 
@@ -71,7 +71,7 @@ pub fn update_schedules(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow:
     return Ok(());
 }
 
-fn run_job(name: String) -> Result<(), anyhow::Error> {
+fn run_job(job: &Job) -> Result<(), anyhow::Error> {
     // Acquires reader lock on job ids (not sure if we really need)
     // If standalone runs the script
     // Otherwise gets a worker IP and sends an execution request to it
