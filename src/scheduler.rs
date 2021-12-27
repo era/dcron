@@ -8,6 +8,8 @@ use std::collections::HashMap;
 use anyhow;
 use closure::closure;
 use std::sync::{Arc, RwLock};
+use std::thread;
+use std::time::Duration;
 
 // Maybe should use an Arc on the Scheduler itself
 pub struct Scheduler<'a> {
@@ -60,14 +62,60 @@ fn schedule_job(job: Arc<Job>, scheduler: &mut Scheduler) -> Result<(), anyhow::
     Ok(())
 }
 
+pub fn tick(scheduler: Arc<RwLock<Scheduler>>) -> ! {
+    loop {
+        if let Ok(mut scheduler) = scheduler.write() {
+            (*scheduler).job_scheduler.tick();
+            thread::sleep(Duration::from_millis(500));
+        } else {
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
+}
+
 pub fn update_schedules(scheduler: Arc<RwLock<Scheduler>>) -> ! {
+    // suppose to be run in a new thread
     // main method
     // loop
-    // every 5 minutes, goes to the database
+    // every x minutes, goes to the database
     // Acquires writer lock and unschedule any job that is needed and deletes from job_ids
     // Acquires writer lock and updates jobs.
     // schedule any new job
-    loop {}
+    loop {
+        thread::sleep(Duration::from_millis(4000));
+        if let Ok(mut scheduler) = scheduler.write() {
+            let last_updated_at = (*scheduler).last_updated_at;
+            let disabled_jobs = match update_scheduler(&mut *scheduler) {
+                Ok(disabled_jobs) => disabled_jobs,
+                _ => continue,
+            };
+            for job in disabled_jobs {
+                let uuid = scheduler.job_ids.remove(&job.name);
+                match uuid {
+                    Some(uuid) => scheduler.job_scheduler.remove(uuid),
+                    None => continue,
+                };
+            }
+            let jobs = (*scheduler).jobs.clone();
+            for (_job_name, job) in jobs {
+                if job.updated_at >= last_updated_at {
+                    let uuid = scheduler.job_ids.remove(&job.name);
+                    match uuid {
+                        Some(uuid) => scheduler.job_scheduler.remove(uuid),
+                        None => false,
+                    };
+
+                    let job = Arc::new(job.clone());
+                    schedule_job(job, &mut *scheduler); //TODO should check result
+                }
+            }
+        }
+    }
+}
+
+// Update the scheduler and return all jobs that were disabled
+fn update_scheduler(scheduler: &mut Scheduler) -> Result<Vec<Job>, anyhow::Error> {
+    Ok(vec![])
 }
 
 fn run_job(job: &Job) -> Result<(), anyhow::Error> {
