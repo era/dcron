@@ -3,13 +3,10 @@ use crate::{
     db,
     job::{self, Job},
 };
-use std::{collections::HashMap, sync::RwLockWriteGuard};
+use std::collections::HashMap;
 // job_scheduler crate https://docs.rs/job_scheduler/1.2.1/job_scheduler/
 use anyhow;
 use closure::closure;
-use job_scheduler::{self, Schedule};
-use serde::{Deserialize, Serialize};
-use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
 // Maybe should use an Arc on the Scheduler itself
