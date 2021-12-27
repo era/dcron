@@ -1,11 +1,12 @@
 use crate::{config::Config, job};
+use chrono::Utc;
+use futures_util::TryStreamExt;
 use mongodb::{
     bson::{doc, Document},
     options::ClientOptions,
+    options::FindOptions,
     Client, Collection, Database,
 };
-
-use chrono::Utc;
 use std::error::Error;
 
 pub enum DBClient {
@@ -62,6 +63,15 @@ impl DB {
             }
         }
         None
+    }
+    pub async fn find_all_active(self: &Self) -> Result<Vec<job::Job>, anyhow::Error> {
+        if let Some(database) = self.get_db() {
+            let collection = database.collection::<job::Job>("jobs");
+            let jobs_cursor = collection.find(doc! {"active": true}, None).await?;
+            return Ok(jobs_cursor.try_collect().await?);
+        } else {
+            return Err(anyhow::anyhow!("Could not connect to the database"));
+        }
     }
 
     pub async fn disable_if_exist(self: &Self, name: &str) -> Result<(), Box<dyn Error>> {

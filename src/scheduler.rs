@@ -27,13 +27,13 @@ pub struct Scheduler<'a> {
 // when updating the jobs, we need to hold a write lock
 // the job thread should request read lock, and send the job to a worker
 
-pub async fn new() -> Result<(), anyhow::Error> {
+pub async fn run() -> Result<(), anyhow::Error> {
     // Gets all the jobs from the database and set jobs
     // Creates the new object
     return Err(anyhow::anyhow!("Opss"));
 }
 
-pub fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> {
+fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> {
     // Get write lock
     // Schedule all the jobs and setup jobs_id
     // meant to be run once when we start the scheduler
@@ -73,7 +73,7 @@ pub fn tick(scheduler: Arc<RwLock<Scheduler>>) -> ! {
     }
 }
 
-pub fn update_schedules(scheduler: Arc<RwLock<Scheduler>>) -> ! {
+fn update_schedules(scheduler: Arc<RwLock<Scheduler>>) -> ! {
     // suppose to be run in a new thread
     // main method
     // loop
