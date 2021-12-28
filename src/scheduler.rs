@@ -3,6 +3,7 @@ use crate::{
     db,
     job::{self, Job},
 };
+use chrono::Utc;
 use std::collections::HashMap;
 use std::env;
 // job_scheduler crate https://docs.rs/job_scheduler/1.2.1/job_scheduler/
@@ -31,7 +32,7 @@ pub struct Scheduler<'a> {
 // when updating the jobs, we need to hold a write lock
 // the job thread should request read lock, and send the job to a worker
 
-pub async fn run() -> ! {
+pub async fn run() -> () {
     // Gets all the jobs from the database and set jobs
     // Creates the new object
     // and finally runs the Scheduler
@@ -61,7 +62,7 @@ pub async fn run() -> ! {
     let mut scheduler = Scheduler {
         jobs: HashMap::new(),
         job_ids: HashMap::new(),
-        last_updated_at: 0,
+        last_updated_at: Utc::now().timestamp(),
         job_scheduler: job_scheduler::JobScheduler::new(),
         config: config,
     };
@@ -74,7 +75,7 @@ pub async fn run() -> ! {
 
     schedule_all(arc_scheduler.clone()).unwrap();
 
-    update_schedules(arc_scheduler.clone()); // This runs in a loop
+    update_schedules(arc_scheduler.clone()).await; // This runs in a loop
 }
 
 fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> {
@@ -115,7 +116,7 @@ pub fn tick(scheduler: Arc<RwLock<Scheduler>>) -> () {
     }
 }
 
-fn update_schedules(scheduler: Arc<RwLock<Scheduler>>) -> ! {
+async fn update_schedules<'a>(scheduler: Arc<RwLock<Scheduler<'a>>>) -> () {
     // suppose to be run in a new thread
     // main method
     // loop
@@ -128,7 +129,7 @@ fn update_schedules(scheduler: Arc<RwLock<Scheduler>>) -> ! {
         thread::sleep(Duration::from_millis(4000));
         if let Ok(mut scheduler) = scheduler.write() {
             let last_updated_at = (*scheduler).last_updated_at;
-            let disabled_jobs = match update_scheduler(&mut *scheduler) {
+            let disabled_jobs = match update_scheduler(&mut *scheduler).await {
                 Ok(disabled_jobs) => disabled_jobs,
                 _ => continue,
             };
@@ -157,8 +158,25 @@ fn update_schedules(scheduler: Arc<RwLock<Scheduler>>) -> ! {
 }
 
 // Update the scheduler and return all jobs that were disabled
-fn update_scheduler(scheduler: &mut Scheduler) -> Result<Vec<Job>, anyhow::Error> {
-    Ok(vec![])
+async fn update_scheduler<'a>(scheduler: &mut Scheduler<'a>) -> Result<Vec<Job>, anyhow::Error> {
+    let config = &scheduler.config;
+    let last_updated_at = scheduler.last_updated_at;
+    let db = match db::get_db(config).await {
+        Ok(db) => db,
+        _ => panic!("Could not get DB"),
+    };
+
+    let active_jobs = db.find_all_since(true, last_updated_at).await?;
+    scheduler.jobs.clear();
+
+    for job in active_jobs {
+        scheduler.jobs.insert(job.name.clone(), job);
+    }
+
+    scheduler.last_updated_at = Utc::now().timestamp();
+    let deleted_jobs = db.find_all_since(false, last_updated_at).await?;
+
+    Ok(deleted_jobs)
 }
 
 fn run_job(job: &Job) -> Result<(), anyhow::Error> {

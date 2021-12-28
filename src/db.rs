@@ -74,6 +74,22 @@ impl DB {
         }
     }
 
+    pub async fn find_all_since(
+        self: &Self,
+        active: bool,
+        since: i64,
+    ) -> Result<Vec<job::Job>, anyhow::Error> {
+        if let Some(database) = self.get_db() {
+            let collection = database.collection::<job::Job>("jobs");
+            let jobs_cursor = collection
+                .find(doc! {"active": active, "updated_at": {"$gt": since}}, None)
+                .await?;
+            return Ok(jobs_cursor.try_collect().await?);
+        } else {
+            return Err(anyhow::anyhow!("Could not connect to the database"));
+        }
+    }
+
     pub async fn disable_if_exist(self: &Self, name: &str) -> Result<(), Box<dyn Error>> {
         if let Some(database) = self.get_db() {
             if let Some(_job) = self.find_job(name, true).await {
