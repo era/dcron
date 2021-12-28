@@ -12,6 +12,7 @@ use job_scheduler::Schedule;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
+use tokio::task;
 
 // Maybe should use an Arc on the Scheduler itself
 pub struct Scheduler<'a> {
@@ -30,9 +31,10 @@ pub struct Scheduler<'a> {
 // when updating the jobs, we need to hold a write lock
 // the job thread should request read lock, and send the job to a worker
 
-pub async fn run() -> Result<(), anyhow::Error> {
+pub async fn run() -> ! {
     // Gets all the jobs from the database and set jobs
     // Creates the new object
+    // and finally runs the Scheduler
 
     let config_file = match env::var("DCRON_CONFIG") {
         Ok(config_file) => config_file,
@@ -48,7 +50,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
 
     let db = match db::get_db(&config).await {
         Ok(db) => db,
-        _ => return Err(anyhow::anyhow!("Could not get database")),
+        _ => panic!("Could not get DB"),
     };
 
     let jobs = match db.find_all_active().await {
@@ -56,7 +58,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         _ => panic!("Could not initialise jobs"),
     };
 
-    let scheduler = Scheduler {
+    let mut scheduler = Scheduler {
         jobs: HashMap::new(),
         job_ids: HashMap::new(),
         last_updated_at: 0,
@@ -64,12 +66,15 @@ pub async fn run() -> Result<(), anyhow::Error> {
         config: config,
     };
 
-    // Convert jobs to our HashMap in the scheduler
-    // call schedule_all
-    // setup thread for tick
-    // setup thread for update_schedules
+    for job in jobs {
+        scheduler.jobs.insert(job.name.clone(), job);
+    }
 
-    return Ok(());
+    let arc_scheduler = Arc::new(RwLock::new(scheduler));
+
+    schedule_all(arc_scheduler.clone()).unwrap();
+
+    update_schedules(arc_scheduler.clone()); // This runs in a loop
 }
 
 fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> {
@@ -101,14 +106,12 @@ fn schedule_job(job: Arc<Job>, scheduler: &mut Scheduler) -> Result<(), anyhow::
     Ok(())
 }
 
-pub fn tick(scheduler: Arc<RwLock<Scheduler>>) -> ! {
-    loop {
-        if let Ok(mut scheduler) = scheduler.write() {
-            (*scheduler).job_scheduler.tick();
-            thread::sleep(Duration::from_millis(500));
-        } else {
-            thread::sleep(Duration::from_millis(50));
-        }
+pub fn tick(scheduler: Arc<RwLock<Scheduler>>) -> () {
+    if let Ok(mut scheduler) = scheduler.write() {
+        (*scheduler).job_scheduler.tick();
+        thread::sleep(Duration::from_millis(50));
+    } else {
+        thread::sleep(Duration::from_millis(5));
     }
 }
 
@@ -121,6 +124,7 @@ fn update_schedules(scheduler: Arc<RwLock<Scheduler>>) -> ! {
     // Acquires writer lock and updates jobs.
     // schedule any new job
     loop {
+        tick(scheduler.clone()); // This should be running in another thread
         thread::sleep(Duration::from_millis(4000));
         if let Ok(mut scheduler) = scheduler.write() {
             let last_updated_at = (*scheduler).last_updated_at;
