@@ -183,5 +183,6 @@ fn run_job(job: &Job) -> Result<(), anyhow::Error> {
     // Acquires reader lock on job ids (not sure if we really need)
     // If standalone runs the script
     // Otherwise gets a worker IP and sends an execution request to it
+    println!("Would execute: {:?}", job);
     Ok(())
 }
