@@ -4,9 +4,11 @@ use crate::{
     job::{self, Job},
 };
 use std::collections::HashMap;
+use std::env;
 // job_scheduler crate https://docs.rs/job_scheduler/1.2.1/job_scheduler/
 use anyhow;
 use closure::closure;
+use job_scheduler::Schedule;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
@@ -20,6 +22,7 @@ pub struct Scheduler<'a> {
     // Used to request to the database only jobs created after it
     last_updated_at: i64,
     job_scheduler: job_scheduler::JobScheduler<'a>,
+    config: Config,
 }
 
 // Get all the jobs in the database and updates it every 5 min
@@ -30,7 +33,43 @@ pub struct Scheduler<'a> {
 pub async fn run() -> Result<(), anyhow::Error> {
     // Gets all the jobs from the database and set jobs
     // Creates the new object
-    return Err(anyhow::anyhow!("Opss"));
+
+    let config_file = match env::var("DCRON_CONFIG") {
+        Ok(config_file) => config_file,
+        _ => "app.toml".into(),
+    };
+
+    let config = Config::from(&config_file);
+
+    let config = match config {
+        Ok(config) => config,
+        _ => panic!("Error while trying to read configuration file"),
+    };
+
+    let db = match db::get_db(&config).await {
+        Ok(db) => db,
+        _ => return Err(anyhow::anyhow!("Could not get database")),
+    };
+
+    let jobs = match db.find_all_active().await {
+        Ok(jobs) => jobs,
+        _ => panic!("Could not initialise jobs"),
+    };
+
+    let scheduler = Scheduler {
+        jobs: HashMap::new(),
+        job_ids: HashMap::new(),
+        last_updated_at: 0,
+        job_scheduler: job_scheduler::JobScheduler::new(),
+        config: config,
+    };
+
+    // Convert jobs to our HashMap in the scheduler
+    // call schedule_all
+    // setup thread for tick
+    // setup thread for update_schedules
+
+    return Ok(());
 }
 
 fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> {
