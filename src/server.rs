@@ -11,7 +11,6 @@ use tonic::{transport::Server, Code, Request, Response, Status};
 mod config;
 mod db;
 mod job;
-mod scheduler;
 mod storage;
 
 pub mod dcron {

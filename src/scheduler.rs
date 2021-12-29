@@ -1,8 +1,4 @@
-use crate::{
-    config::Config,
-    db,
-    job::{self, Job},
-};
+use crate::config::Config;
 use chrono::Utc;
 use std::collections::HashMap;
 use std::env;
@@ -14,11 +10,15 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 use tokio::task;
+mod config;
+mod db;
+mod job;
+mod storage;
 
 // Maybe should use an Arc on the Scheduler itself
 pub struct Scheduler<'a> {
     // Holds the main Job struct
-    jobs: HashMap<String, Job>,
+    jobs: HashMap<String, job::Job>,
     // Used to unschedule a job if needed
     job_ids: HashMap<String, job_scheduler::Uuid>,
     // Used to request to the database only jobs created after it
@@ -32,7 +32,8 @@ pub struct Scheduler<'a> {
 // when updating the jobs, we need to hold a write lock
 // the job thread should request read lock, and send the job to a worker
 
-pub async fn run() -> () {
+#[tokio::main]
+pub async fn main() -> () {
     // Gets all the jobs from the database and set jobs
     // Creates the new object
     // and finally runs the Scheduler
@@ -94,7 +95,7 @@ fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> 
     return Ok(());
 }
 
-fn schedule_job(job: Arc<Job>, scheduler: &mut Scheduler) -> Result<(), anyhow::Error> {
+fn schedule_job(job: Arc<job::Job>, scheduler: &mut Scheduler) -> Result<(), anyhow::Error> {
     let job_name = (&*job).name.clone();
     let job_id = scheduler.job_scheduler.add(job_scheduler::Job::new(
         (&job.time).parse().unwrap(),
@@ -158,7 +159,9 @@ async fn update_schedules<'a>(scheduler: Arc<RwLock<Scheduler<'a>>>) -> () {
 }
 
 // Update the scheduler and return all jobs that were disabled
-async fn update_scheduler<'a>(scheduler: &mut Scheduler<'a>) -> Result<Vec<Job>, anyhow::Error> {
+async fn update_scheduler<'a>(
+    scheduler: &mut Scheduler<'a>,
+) -> Result<Vec<job::Job>, anyhow::Error> {
     let config = &scheduler.config;
     let last_updated_at = scheduler.last_updated_at;
     let db = match db::get_db(config).await {
@@ -179,7 +182,7 @@ async fn update_scheduler<'a>(scheduler: &mut Scheduler<'a>) -> Result<Vec<Job>,
     Ok(deleted_jobs)
 }
 
-fn run_job(job: &Job) -> Result<(), anyhow::Error> {
+fn run_job(job: &job::Job) -> Result<(), anyhow::Error> {
     // Acquires reader lock on job ids (not sure if we really need)
     // If standalone runs the script
     // Otherwise gets a worker IP and sends an execution request to it
