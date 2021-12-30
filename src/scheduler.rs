@@ -6,10 +6,12 @@ use std::env;
 use anyhow;
 use closure::closure;
 use job_scheduler::Schedule;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockWriteGuard};
 use std::thread;
 use std::time::Duration;
 use tokio::task;
+use crate::job::Job;
+
 mod config;
 mod db;
 mod job;
@@ -49,7 +51,13 @@ pub async fn main() -> () {
         Ok(config) => config,
         _ => panic!("Error while trying to read configuration file"),
     };
+    //if leader
+    run_leader_scheduler(config).await; // run an infinity loop
+    // else don't do anything, just keep waiting and checking
+    // if we won the electin
+}
 
+async fn run_leader_scheduler(config: Config) {
     let db = match db::get_db(&config).await {
         Ok(db) => db,
         _ => panic!("Could not get DB"),
@@ -76,7 +84,7 @@ pub async fn main() -> () {
 
     schedule_all(arc_scheduler.clone()).unwrap();
 
-    update_schedules(arc_scheduler.clone()).await; // This runs in a loop
+    fetch_job_updates(arc_scheduler.clone()).await; // This runs in a loop
 }
 
 fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> {
@@ -117,7 +125,7 @@ pub fn tick(scheduler: Arc<RwLock<Scheduler>>) -> () {
     }
 }
 
-async fn update_schedules<'a>(scheduler: Arc<RwLock<Scheduler<'a>>>) -> () {
+async fn fetch_job_updates<'a>(scheduler: Arc<RwLock<Scheduler<'a>>>) -> () {
     // suppose to be run in a new thread
     // main method
     // loop
@@ -125,6 +133,7 @@ async fn update_schedules<'a>(scheduler: Arc<RwLock<Scheduler<'a>>>) -> () {
     // Acquires writer lock and unschedule any job that is needed and deletes from job_ids
     // Acquires writer lock and updates jobs.
     // schedule any new job
+    // TODO: Should also check if we are still the leader
     loop {
         tick(scheduler.clone()); // This should be running in another thread
         thread::sleep(Duration::from_millis(4000));
@@ -134,27 +143,34 @@ async fn update_schedules<'a>(scheduler: Arc<RwLock<Scheduler<'a>>>) -> () {
                 Ok(disabled_jobs) => disabled_jobs,
                 _ => continue,
             };
-            for job in disabled_jobs {
-                let uuid = scheduler.job_ids.remove(&job.name);
-                match uuid {
-                    Some(uuid) => scheduler.job_scheduler.remove(uuid),
-                    None => continue,
-                };
-            }
-            let jobs = (*scheduler).jobs.clone();
-            for (_job_name, job) in jobs {
-                if job.updated_at >= last_updated_at {
-                    let uuid = scheduler.job_ids.remove(&job.name);
-                    match uuid {
-                        Some(uuid) => scheduler.job_scheduler.remove(uuid),
-                        None => false,
-                    };
-
-                    let job = Arc::new(job.clone());
-                    schedule_job(job, &mut *scheduler); //TODO should check result
-                }
-            }
+            disable_jobs(&mut scheduler, disabled_jobs);
+            reschedule_jobs_if_needed(&mut scheduler, last_updated_at, (*scheduler).jobs.clone());
         }
+    }
+}
+
+fn reschedule_jobs_if_needed(scheduler: &mut RwLockWriteGuard<Scheduler>, last_updated_at: i64, jobs: HashMap<String, Job>) {
+    for (_job_name, job) in jobs {
+        if job.updated_at >= last_updated_at {
+            let uuid = scheduler.job_ids.remove(&job.name);
+            match uuid {
+                Some(uuid) => scheduler.job_scheduler.remove(uuid),
+                None => false,
+            };
+
+            let job = Arc::new(job.clone());
+            schedule_job(job, &mut *scheduler); //TODO should check result
+        }
+    }
+}
+
+fn disable_jobs(scheduler: &mut RwLockWriteGuard<Scheduler>, disabled_jobs: Vec<Job>) {
+    for job in disabled_jobs {
+        let uuid = scheduler.job_ids.remove(&job.name);
+        match uuid {
+            Some(uuid) => scheduler.job_scheduler.remove(uuid),
+            None => continue,
+        };
     }
 }
 
