@@ -73,7 +73,7 @@ async fn run_leader_scheduler(config: Config) {
         job_ids: HashMap::new(),
         last_updated_at: Utc::now().timestamp(),
         job_scheduler: job_scheduler::JobScheduler::new(),
-        config: config,
+        config,
     };
 
     for job in jobs {
