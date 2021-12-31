@@ -2,6 +2,7 @@ use crate::config::Config;
 use chrono::Utc;
 use std::collections::HashMap;
 use std::env;
+use std::rc::Rc;
 // job_scheduler crate https://docs.rs/job_scheduler/1.2.1/job_scheduler/
 use anyhow;
 use closure::closure;
@@ -29,6 +30,11 @@ pub struct Scheduler<'a> {
     config: Config,
 }
 
+enum Role {
+    LEADER,
+    FOLLOWER,
+}
+
 // Get all the jobs in the database and updates it every 5 min
 // Schedule the jobs using job_scheduler and keeps their uuid
 // when updating the jobs, we need to hold a write lock
@@ -51,13 +57,35 @@ pub async fn main() -> () {
         Ok(config) => config,
         _ => panic!("Error while trying to read configuration file"),
     };
+
+    let role: Arc<RwLock<Role>> = Arc::new(RwLock::new(Role::FOLLOWER));
+
+    let instance_role = role.clone();
+
+
+    tokio::spawn(async move {
+        run_health_checks(instance_role);
+    });
+
     //if leader
-    run_leader_scheduler(config).await; // run an infinity loop
+    run_leader_scheduler(config, role).await; // run an infinity loop
     // else don't do anything, just keep waiting and checking
     // if we won the electin
 }
 
-async fn run_leader_scheduler(config: Config) {
+fn run_health_checks(health_checks_role: Arc<RwLock<Role>>) {
+    loop {
+        thread::sleep(Duration::from_millis(500));
+        //TODO implement the logic here
+        if let Ok(mut role) = health_checks_role.write() {
+            //TODO for now we only have one instance which is always the leader
+            *role = Role::LEADER;
+        }
+    }
+}
+
+
+async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> !{
     let db = match db::get_db(&config).await {
         Ok(db) => db,
         _ => panic!("Could not get DB"),
@@ -67,24 +95,39 @@ async fn run_leader_scheduler(config: Config) {
         Ok(jobs) => jobs,
         _ => panic!("Could not initialise jobs"),
     };
+    let role = &role.clone();
+    loop {
+        if let Ok(role) = role.read() {
+            match *role {
+                Role::LEADER => println!("Still leader"),
+                //TODO we probably can sleep after finding out we are a follower
+                Role::FOLLOWER => continue, // Nothing to do, wait until we are the leader
+            };
+        } else {
+            // sleep and retry later
+            thread::sleep(Duration::from_millis(50));
+            continue;
+        }
 
-    let mut scheduler = Scheduler {
-        jobs: HashMap::new(),
-        job_ids: HashMap::new(),
-        last_updated_at: Utc::now().timestamp(),
-        job_scheduler: job_scheduler::JobScheduler::new(),
-        config,
-    };
+        let mut scheduler = Scheduler {
+            jobs: HashMap::new(),
+            job_ids: HashMap::new(),
+            last_updated_at: Utc::now().timestamp(),
+            job_scheduler: job_scheduler::JobScheduler::new(),
+            config: config.clone(),
+        };
 
-    for job in jobs {
-        scheduler.jobs.insert(job.name.clone(), job);
+        for job in &jobs {
+            scheduler.jobs.insert(job.name.clone(), job.clone());
+        }
+
+        let arc_scheduler = Arc::new(RwLock::new(scheduler));
+
+        schedule_all(arc_scheduler.clone()).unwrap();
+
+        fetch_job_updates(arc_scheduler.clone(), role.clone()).await; // This runs in a loop
+
     }
-
-    let arc_scheduler = Arc::new(RwLock::new(scheduler));
-
-    schedule_all(arc_scheduler.clone()).unwrap();
-
-    fetch_job_updates(arc_scheduler.clone()).await; // This runs in a loop
 }
 
 fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> {
@@ -125,7 +168,7 @@ pub fn tick(scheduler: Arc<RwLock<Scheduler>>) -> () {
     }
 }
 
-async fn fetch_job_updates<'a>(scheduler: Arc<RwLock<Scheduler<'a>>>) -> () {
+async fn fetch_job_updates<'a>(scheduler: Arc<RwLock<Scheduler<'a>>>, role: Arc<RwLock<Role>>) -> () {
     // suppose to be run in a new thread
     // main method
     // loop
@@ -144,8 +187,18 @@ async fn fetch_job_updates<'a>(scheduler: Arc<RwLock<Scheduler<'a>>>) -> () {
                 _ => continue,
             };
             disable_jobs(&mut scheduler, disabled_jobs);
-            reschedule_jobs_if_needed(&mut scheduler, last_updated_at, (*scheduler).jobs.clone());
+            let jobs = (*scheduler).jobs.clone();
+            reschedule_jobs_if_needed(&mut scheduler, last_updated_at, jobs);
         }
+
+        //This is terrible, but for now we also check here if we are still the leader
+        // if not we should break and stop updating our scheduler
+        if let Ok(role) = role.read() {
+            match *role {
+                Role::LEADER => println!("Still leader"),
+                Role::FOLLOWER => break,
+            };
+        } // We don't need to check, we may act as a leader for longer than we should, but is ok for now
     }
 }
 
