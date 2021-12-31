@@ -1,5 +1,5 @@
 # dcron
-**Status**: Design phase
+**Status**: WIP
 
 The idea for this project is to enable users to schedule and run cron-like jobs without having to worry about *where* the script will run. For this to happen a client should be able to talk with any server to schedule a job or retrieve a job result/log. In order to keep the logs accessible by a web-interface, once the job is done 
 the log will be uploaded to a object storage service (such as S3, ceph or openstack Swift). The client will also upload the script it wants to run in a object storage service and only give to the server the time it wants it to run (using cron-syntax) and the intepreter the server should use to run it.
@@ -13,6 +13,8 @@ The service assumes the client is trustworth, so there won't be any complex chec
 The service always look 5 minutes backward in order to schedule services. If the service crashes for a long period, it won't try to run all the jobs from that period.
 
 ## API
+
+For the public API, look at the proto/dcron.proto `Public` service definition. `dcron-client` is a client of that gRPC. The `Internal` service is used for the communication between Leader and followers.
 
 ### Communication between client and server
 #### API: CREATE JOB
@@ -78,29 +80,18 @@ Worker to leader node
 
 ## Implementation Details
 
-### Leader election
+### Leader Role
 
-Consensus: https://raft.github.io/
-
-The leader is only need to coordinate which machine is going to run which job. The machines can talk directly to the documentDB to save result of jobs and to insert new jobs.
+The leader only needs to coordinate which machine is going to run which job. The machines can talk directly to the documentDB to save result of jobs and to insert new jobs.
 
 The Execution document at the Database is append-only, meaning that if due to timeout two machines execute the same job, both executions will be kept at the database.
 
 Timeouts can be set to zero, meaning the service won't retry the job until the executions finishes. You still should always write your scripts keeping in mind two jobs can run in paralell (in case of network split).
 
-### Web Interface
-
-The web interface will have very few features, it can see the jobs, their executions, and logs. It won't be possible for now to change any data about the job itself. The idea is that most of the configuration should be done always using the client. In the future the idea is to have a way to template the jobs, similar to Terraform.
-
-
-### Language
-RUST
-
-I'm still not sure if I will go with Go or Rust. I plan to use gRPC for the communication between computers, ~~and it seems like there is not great support for gRPC in the Rust community (may be wrong)~~ (tonic: https://github.com/hyperium/tonic/blob/master/examples/helloworld-tutorial.md ). Go would be fine for the service, given that there's no heavy CPU bound operation. Running the scripts itself should be a task for the OS.
-
-IMHO it's much easier to keep a Rust project healthy, since it's harder to write good Go code (given the lack of compiler support and lack of strategies to handle errors). On the other hand, it's very hard to write a PoC in Rust, since the compiler wants us to write code that works at production level right away.
-
-
 ### Libre Software
 
 This will be a Free Software as defined by the Free Software Foundation: https://www.gnu.org/philosophy/free-sw.html
+
+# Thought about, not used
+
+Consensus: https://raft.github.io/
