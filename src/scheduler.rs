@@ -64,24 +64,34 @@ pub async fn main() -> () {
 
 
     tokio::spawn(async move {
-        run_health_checks(instance_role);
+        run_health_checks(instance_role, config.clone());
     });
 
     //if leader
     run_leader_scheduler(config, role).await; // run an infinity loop
     // else don't do anything, just keep waiting and checking
-    // if we won the electin
+    // if we won the election
 }
 
-fn run_health_checks(health_checks_role: Arc<RwLock<Role>>) {
+fn run_health_checks(health_checks_role: Arc<RwLock<Role>>, config: Config) {
     loop {
         thread::sleep(Duration::from_millis(500));
         //TODO implement the logic here
         if let Ok(mut role) = health_checks_role.write() {
-            //TODO for now we only have one instance which is always the leader
-            *role = Role::LEADER;
+            heartbeat(config.clone());
+            *role = role_should_assume(config.clone()).unwrap(); //TODO
         }
     }
+}
+
+fn heartbeat(config: Config) {
+}
+
+fn role_should_assume(config: Config) -> Result<Role, anyhow::Error> {
+    // select ips that sent a heartbeat in the last 30 seconds
+    // if the smallest IP is us, return Leader
+    // otherwise follower
+    Ok(Role::LEADER)
 }
 
 
