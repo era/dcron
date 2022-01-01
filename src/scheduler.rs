@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::env;
 use std::rc::Rc;
 // job_scheduler crate https://docs.rs/job_scheduler/1.2.1/job_scheduler/
+use crate::job::Job;
 use anyhow;
 use closure::closure;
 use job_scheduler::Schedule;
@@ -11,7 +12,6 @@ use std::sync::{Arc, RwLock, RwLockWriteGuard};
 use std::thread;
 use std::time::Duration;
 use tokio::task;
-use crate::job::Job;
 
 mod config;
 mod db;
@@ -62,20 +62,19 @@ pub async fn main() -> () {
 
     let instance_role = role.clone();
 
-
     tokio::spawn(async move {
         run_health_checks(instance_role, config.clone());
     });
 
     //if leader
     run_leader_scheduler(config, role).await; // run an infinity loop
-    // else don't do anything, just keep waiting and checking
-    // if we won the election
+                                              // else don't do anything, just keep waiting and checking
+                                              // if we won the election
 }
 
 fn run_health_checks(health_checks_role: Arc<RwLock<Role>>, config: Config) {
     loop {
-        thread::sleep(Duration::from_millis(500));
+        thread::sleep(Duration::from_millis(5000));
         //TODO implement the logic here
         if let Ok(mut role) = health_checks_role.write() {
             heartbeat(config.clone());
@@ -84,8 +83,7 @@ fn run_health_checks(health_checks_role: Arc<RwLock<Role>>, config: Config) {
     }
 }
 
-fn heartbeat(config: Config) {
-}
+fn heartbeat(config: Config) {}
 
 fn role_should_assume(config: Config) -> Result<Role, anyhow::Error> {
     // select ips that sent a heartbeat in the last 30 seconds
@@ -94,8 +92,7 @@ fn role_should_assume(config: Config) -> Result<Role, anyhow::Error> {
     Ok(Role::LEADER)
 }
 
-
-async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> !{
+async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> ! {
     let db = match db::get_db(&config).await {
         Ok(db) => db,
         _ => panic!("Could not get DB"),
@@ -136,7 +133,6 @@ async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> !{
         schedule_all(arc_scheduler.clone()).unwrap();
 
         fetch_job_updates(arc_scheduler.clone(), role.clone()).await; // This runs in a loop
-
     }
 }
 
@@ -178,7 +174,10 @@ pub fn tick(scheduler: Arc<RwLock<Scheduler>>) -> () {
     }
 }
 
-async fn fetch_job_updates<'a>(scheduler: Arc<RwLock<Scheduler<'a>>>, role: Arc<RwLock<Role>>) -> () {
+async fn fetch_job_updates<'a>(
+    scheduler: Arc<RwLock<Scheduler<'a>>>,
+    role: Arc<RwLock<Role>>,
+) -> () {
     // suppose to be run in a new thread
     // main method
     // loop
@@ -212,7 +211,11 @@ async fn fetch_job_updates<'a>(scheduler: Arc<RwLock<Scheduler<'a>>>, role: Arc<
     }
 }
 
-fn reschedule_jobs_if_needed(scheduler: &mut RwLockWriteGuard<Scheduler>, last_updated_at: i64, jobs: HashMap<String, Job>) {
+fn reschedule_jobs_if_needed(
+    scheduler: &mut RwLockWriteGuard<Scheduler>,
+    last_updated_at: i64,
+    jobs: HashMap<String, Job>,
+) {
     for (_job_name, job) in jobs {
         if job.updated_at >= last_updated_at {
             let uuid = scheduler.job_ids.remove(&job.name);
