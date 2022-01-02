@@ -7,6 +7,7 @@ use std::rc::Rc;
 use crate::job::Job;
 use anyhow;
 use closure::closure;
+use futures::executor::ThreadPool;
 use job_scheduler::Schedule;
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
 use std::thread;
@@ -29,7 +30,7 @@ pub struct Scheduler<'a> {
     job_scheduler: job_scheduler::JobScheduler<'a>,
     config: Config,
 }
-
+#[derive(Clone, PartialEq, Eq)]
 enum Role {
     LEADER,
     FOLLOWER,
@@ -61,29 +62,41 @@ pub async fn main() -> () {
     let role: Arc<RwLock<Role>> = Arc::new(RwLock::new(Role::FOLLOWER));
 
     let instance_role = role.clone();
-
+    let health_check_config = config.clone();
     tokio::spawn(async move {
-        run_health_checks(instance_role, config.clone());
+        run_health_checks(instance_role, health_check_config);
     });
 
     //if leader
-    run_leader_scheduler(config, role).await; // run an infinity loop
-                                              // else don't do anything, just keep waiting and checking
-                                              // if we won the election
+    run_leader_scheduler(config.clone(), role).await; // run an infinity loop
+                                                      // else don't do anything, just keep waiting and checking
+                                                      // if we won the election
+}
+
+fn server_name() -> String {
+    "test".into()
 }
 
 fn run_health_checks(health_checks_role: Arc<RwLock<Role>>, config: Config) {
+    let pool = ThreadPool::new().unwrap(); // probably move away from here
+
     loop {
         thread::sleep(Duration::from_millis(5000));
+        pool.spawn_ok(heartbeat(config.clone()));
         //TODO implement the logic here
         if let Ok(mut role) = health_checks_role.write() {
-            heartbeat(config.clone());
             *role = role_should_assume(config.clone()).unwrap(); //TODO
         }
     }
 }
 
-fn heartbeat(config: Config) {}
+async fn heartbeat(config: Config) {
+    if let Ok(db) = db::get_db(&config).await {
+        db.send_heartbeat(&server_name());
+    } else {
+        println!("Could not send heartbeat");
+    }
+}
 
 fn role_should_assume(config: Config) -> Result<Role, anyhow::Error> {
     // select ips that sent a heartbeat in the last 30 seconds
@@ -131,7 +144,6 @@ async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> ! {
         let arc_scheduler = Arc::new(RwLock::new(scheduler));
 
         schedule_all(arc_scheduler.clone()).unwrap();
-
         fetch_job_updates(arc_scheduler.clone(), role.clone()).await; // This runs in a loop
     }
 }
@@ -187,7 +199,7 @@ async fn fetch_job_updates<'a>(
     // schedule any new job
     // TODO: Should also check if we are still the leader
     loop {
-        tick(scheduler.clone()); // This should be running in another thread
+        tick(scheduler.clone());
         thread::sleep(Duration::from_millis(4000));
         if let Ok(mut scheduler) = scheduler.write() {
             let last_updated_at = (*scheduler).last_updated_at;

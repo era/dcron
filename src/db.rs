@@ -4,7 +4,6 @@ use futures_util::TryStreamExt;
 use mongodb::{
     bson::{doc, Document},
     options::ClientOptions,
-    options::FindOptions,
     Client, Collection, Database,
 };
 use std::error::Error;
@@ -17,6 +16,7 @@ pub struct DB {
     client: Option<DBClient>,
 }
 
+//TODO transform this in a trait/impl
 impl DB {
     pub fn connection_url(username: &str, password: &str, cluster_url: &str) -> String {
         format!(
@@ -36,6 +36,21 @@ impl DB {
         Ok(DB {
             client: Some(DBClient::MongoDB(client)),
         })
+    }
+
+    pub async fn send_heartbeat(self: &Self, server_name: &str) -> Result<(), anyhow::Error> {
+        if let Some(database) = self.get_db() {
+            let collection = database.collection("heartbeats");
+            collection
+                .insert_one(
+                    doc! { "server": server_name, "timestamp": Utc::now().timestamp()},
+                    None,
+                )
+                .await?;
+
+            return Ok(());
+        }
+        Err(anyhow::anyhow!("Unknown error while saving heartbeats"))
     }
 
     pub async fn local_connection() -> Result<DB, Box<dyn std::error::Error>> {

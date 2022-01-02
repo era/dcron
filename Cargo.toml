@@ -3,14 +3,12 @@ name = "dcron"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-
-[[bin]] # Bin to run the HelloWorld gRPC server
+[[bin]] # Bin to run the Public gRPC server
 name = "dcron-server"
 path = "src/server.rs"
 
-[[bin]] # Bin to run the HelloWorld gRPC client
+[[bin]] # Bin to run the Public gRPC client
 name = "dcron-client"
 path = "src/client.rs"
 
@@ -26,7 +24,7 @@ chrono = "0.4.0"
 once_cell = "1.8.0"
 clap = "2.33.0"
 anyhow = "1.0.51"
-futures = "0.3.18"
+futures = {version = "0.3.18", features = ["thread-pool"] }
 toml = "0.5.8"
 rust-s3 = "0.27.0"
 serde = { version = "1.0", features = ["derive"] }
