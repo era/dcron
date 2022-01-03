@@ -36,6 +36,18 @@ enum Role {
     FOLLOWER,
 }
 
+impl Scheduler<'_> {
+    pub fn new(config: Config) -> Self {
+        Self {
+            jobs: HashMap::new(),
+            job_ids: HashMap::new(),
+            last_updated_at: Utc::now().timestamp(),
+            job_scheduler: job_scheduler::JobScheduler::new(),
+            config,
+        }
+    }
+}
+
 // Get all the jobs in the database and updates it every 5 min
 // Schedule the jobs using job_scheduler and keeps their uuid
 // when updating the jobs, we need to hold a write lock
@@ -129,13 +141,7 @@ async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> ! {
             continue;
         }
 
-        let mut scheduler = Scheduler {
-            jobs: HashMap::new(),
-            job_ids: HashMap::new(),
-            last_updated_at: Utc::now().timestamp(),
-            job_scheduler: job_scheduler::JobScheduler::new(),
-            config: config.clone(),
-        };
+        let mut scheduler = Scheduler::new(config.clone());
 
         for job in &jobs {
             scheduler.jobs.insert(job.name.clone(), job.clone());
