@@ -46,6 +46,11 @@ impl Scheduler<'_> {
             config,
         }
     }
+    pub fn add_jobs(self: &mut Self, jobs: Vec<Job>) -> () {
+        for job in &jobs {
+            self.jobs.insert(job.name.clone(), job.clone());
+        }
+    }
 }
 
 // Get all the jobs in the database and updates it every 5 min
@@ -79,10 +84,11 @@ pub async fn main() -> () {
         run_health_checks(instance_role, health_check_config);
     });
 
-    //if leader
-    run_leader_scheduler(config.clone(), role).await; // run an infinity loop
-                                                      // else don't do anything, just keep waiting and checking
-                                                      // if we won the election
+    // run an infinity loop
+    // if this instance is a leader it will create a scheduler
+    // and fetch updates for itself
+    // otherwise it will be waiting it to become a leader
+    run_leader_scheduler(config.clone(), role).await;
 }
 
 fn server_name() -> String {
@@ -123,10 +129,6 @@ async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> ! {
         _ => panic!("Could not get DB"),
     };
 
-    let jobs = match db.find_all_active().await {
-        Ok(jobs) => jobs,
-        _ => panic!("Could not initialise jobs"),
-    };
     let role = &role.clone();
     loop {
         if let Ok(role) = role.read() {
@@ -141,16 +143,21 @@ async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> ! {
             continue;
         }
 
+        let jobs = match db.find_all_active().await {
+            Ok(jobs) => jobs,
+            _ => panic!("Could not initialise jobs"),
+        };
+
         let mut scheduler = Scheduler::new(config.clone());
 
-        for job in &jobs {
-            scheduler.jobs.insert(job.name.clone(), job.clone());
-        }
+        scheduler.add_jobs(jobs);
 
         let arc_scheduler = Arc::new(RwLock::new(scheduler));
 
         schedule_all(arc_scheduler.clone()).unwrap();
-        fetch_job_updates(arc_scheduler.clone(), role.clone()).await; // This runs in a loop
+        // This runs in a loop and only breaks if this instance is not
+        // a leader anymore
+        fetch_job_updates(arc_scheduler.clone(), role.clone()).await;
     }
 }
 
@@ -225,7 +232,7 @@ async fn fetch_job_updates<'a>(
                 Role::LEADER => println!("Still leader"),
                 Role::FOLLOWER => break,
             };
-        } // We don't need to check, we may act as a leader for longer than we should, but is ok for now
+        } // If we don't get the lock, we may act as a leader for longer than we should, but is ok for now
     }
 }
 
