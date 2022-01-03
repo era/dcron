@@ -12,6 +12,7 @@ use job_scheduler::Schedule;
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
 use std::thread;
 use std::time::Duration;
+use tokio::runtime;
 use tokio::task;
 
 mod config;
@@ -120,7 +121,10 @@ fn role_should_assume(config: Config) -> Result<Role, anyhow::Error> {
     // select ips that sent a heartbeat in the last 30 seconds
     // if the smallest IP is us, return Leader
     // otherwise follower
-    Ok(Role::LEADER)
+    let basic_rt = runtime::Builder::new_current_thread().build()?;
+
+    let role = basic_rt.block_on(async { Role::LEADER });
+    Ok(role)
 }
 
 async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> ! {
