@@ -231,7 +231,6 @@ async fn fetch_job_updates<'a>(
     // Acquires writer lock and unschedule any job that is needed and deletes from job_ids
     // Acquires writer lock and updates jobs.
     // schedule any new job
-    // TODO: Should also check if we are still the leader
     loop {
         tick(scheduler.clone());
         thread::sleep(Duration::from_millis(4000));
