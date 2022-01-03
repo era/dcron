@@ -1,4 +1,4 @@
-use crate::{config::Config, job};
+use crate::{config::Config, heartbeat, job};
 use chrono::Utc;
 use futures_util::TryStreamExt;
 use mongodb::{
@@ -51,6 +51,29 @@ impl DB {
             return Ok(());
         }
         Err(anyhow::anyhow!("Unknown error while saving heartbeats"))
+    }
+
+    pub async fn most_recent_heartbeat(
+        self: &Self,
+    ) -> Result<Option<heartbeat::Heartbeat>, anyhow::Error> {
+        if let Some(database) = self.get_db() {
+            let collection = database.collection::<heartbeat::Heartbeat>("heartbeats");
+            let since = Utc::now().timestamp() - 30000;
+            let hb = collection
+                .find_one(
+                    doc! { "timestamp": {"$gt": since },"$sort": {
+                       "server": 1,
+                    } },
+                    None,
+                )
+                .await;
+
+            match hb {
+                Ok(Some(hb)) => return Ok(Some(hb)),
+                _ => return Ok(None),
+            }
+        }
+        Err(anyhow::anyhow!("Could not get a heartbeat"))
     }
 
     pub async fn local_connection() -> Result<DB, Box<dyn std::error::Error>> {

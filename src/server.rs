@@ -10,6 +10,7 @@ use std::env;
 use tonic::{transport::Server, Code, Request, Response, Status};
 mod config;
 mod db;
+mod heartbeat;
 mod job;
 mod storage;
 

@@ -17,6 +17,7 @@ use tokio::task;
 
 mod config;
 mod db;
+mod heartbeat;
 mod job;
 mod storage;
 
@@ -93,6 +94,7 @@ pub async fn main() -> () {
 }
 
 fn server_name() -> String {
+    //TODO get the IP:PORT
     "test".into()
 }
 
@@ -102,9 +104,8 @@ fn run_health_checks(health_checks_role: Arc<RwLock<Role>>, config: Config) {
     loop {
         thread::sleep(Duration::from_millis(5000));
         pool.spawn_ok(heartbeat(config.clone()));
-        //TODO implement the logic here
         if let Ok(mut role) = health_checks_role.write() {
-            *role = role_should_assume(config.clone()).unwrap(); //TODO
+            *role = role_should_assume(config.clone()).unwrap();
         }
     }
 }
@@ -122,8 +123,24 @@ fn role_should_assume(config: Config) -> Result<Role, anyhow::Error> {
     // if the smallest IP is us, return Leader
     // otherwise follower
     let basic_rt = runtime::Builder::new_current_thread().build()?;
+    let config = config.clone();
+    let role = basic_rt.block_on(async {
+        let db = match db::get_db(&config).await {
+            Ok(db) => db,
+            _ => return Role::FOLLOWER,
+        };
 
-    let role = basic_rt.block_on(async { Role::LEADER });
+        let hb = match db.most_recent_heartbeat().await {
+            Ok(Some(hb)) => hb,
+            _ => return Role::FOLLOWER,
+        };
+
+        if hb.server == server_name() {
+            Role::LEADER
+        } else {
+            Role::FOLLOWER
+        }
+    });
     Ok(role)
 }
 
