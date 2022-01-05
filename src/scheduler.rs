@@ -286,6 +286,7 @@ fn disable_jobs(scheduler: &mut RwLockWriteGuard<Scheduler>, disabled_jobs: Vec<
 }
 
 // Update the scheduler and return all jobs that were disabled
+// this won't reschedule any job. It's just updating the datastructure
 async fn update_scheduler<'a>(
     scheduler: &mut Scheduler<'a>,
 ) -> Result<Vec<job::Job>, anyhow::Error> {
