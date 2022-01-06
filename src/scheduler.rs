@@ -150,7 +150,6 @@ async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> ! {
         _ => panic!("Could not get DB"),
     };
 
-    let role = &role.clone();
     loop {
         if let Ok(role) = role.read() {
             match *role {
