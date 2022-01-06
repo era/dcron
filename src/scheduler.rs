@@ -269,7 +269,7 @@ fn reschedule_jobs_if_needed(scheduler: &mut RwLockWriteGuard<Scheduler>, last_u
     }
 }
 
-fn disable_jobs(scheduler: &mut RwLockWriteGuard<Scheduler>, disabled_jobs: Vec<Job>) {
+fn disable_jobs(scheduler: &mut Scheduler, disabled_jobs: Vec<Job>) {
     for job in disabled_jobs {
         let uuid = scheduler.job_ids.remove(&job.name);
         match uuid {
