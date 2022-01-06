@@ -2,18 +2,15 @@ use crate::config::Config;
 use chrono::Utc;
 use std::collections::HashMap;
 use std::env;
-use std::rc::Rc;
 // job_scheduler crate https://docs.rs/job_scheduler/1.2.1/job_scheduler/
 use crate::job::Job;
 use anyhow;
 use closure::closure;
 use futures::executor::ThreadPool;
-use job_scheduler::Schedule;
-use std::sync::{Arc, RwLock, RwLockWriteGuard};
+use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 use tokio::runtime;
-use tokio::task;
 
 mod config;
 mod db;
@@ -212,9 +209,6 @@ fn schedule_job(job: job::Job, scheduler: &mut Scheduler) -> Result<(), anyhow::
 pub fn tick(scheduler: Arc<RwLock<Scheduler>>) -> () {
     if let Ok(mut scheduler) = scheduler.write() {
         (*scheduler).job_scheduler.tick();
-        thread::sleep(Duration::from_millis(50));
-    } else {
-        thread::sleep(Duration::from_millis(5));
     }
 }
 
@@ -222,15 +216,8 @@ async fn fetch_job_updates<'a>(
     scheduler: Arc<RwLock<Scheduler<'a>>>,
     role: Arc<RwLock<Role>>,
 ) -> () {
-    // suppose to be run in a new thread
-    // main method
-    // loop
-    // every x minutes, goes to the database
-    // Acquires writer lock and unschedule any job that is needed and deletes from job_ids
-    // Acquires writer lock and updates jobs.
-    // schedule any new job
     loop {
-        tick(scheduler.clone()); //TODO: tick has some sleep logic inside and should be run in another thread in loop
+        tick(scheduler.clone());
         thread::sleep(Duration::from_millis(4000));
         if let Ok(mut scheduler) = scheduler.write() {
             let last_updated_at = (*scheduler).last_updated_at;
@@ -242,7 +229,6 @@ async fn fetch_job_updates<'a>(
 
             reschedule_jobs_if_needed(&mut scheduler, last_updated_at);
         }
-
         //This is terrible, but for now we also check here if we are still the leader
         // if not we should break and stop updating our scheduler
         if let Ok(role) = role.read() {
@@ -250,11 +236,11 @@ async fn fetch_job_updates<'a>(
                 Role::LEADER => println!("Still leader"),
                 Role::FOLLOWER => break,
             };
-        } // If we don't get the lock, we may act as a leader for longer than we should, but is ok for now
+        }
     }
 }
 
-fn reschedule_jobs_if_needed(scheduler: &mut RwLockWriteGuard<Scheduler>, last_updated_at: i64) {
+fn reschedule_jobs_if_needed(scheduler: &mut Scheduler, last_updated_at: i64) {
     let jobs = (*scheduler).jobs.clone();
     for (_job_name, job) in jobs {
         if job.updated_at >= last_updated_at {
