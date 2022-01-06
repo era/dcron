@@ -232,7 +232,7 @@ async fn fetch_job_updates<'a>(
     // Acquires writer lock and updates jobs.
     // schedule any new job
     loop {
-        tick(scheduler.clone());
+        tick(scheduler.clone()); //TODO: tick has some sleep logic inside and should be run in another thread in loop
         thread::sleep(Duration::from_millis(4000));
         if let Ok(mut scheduler) = scheduler.write() {
             let last_updated_at = (*scheduler).last_updated_at;
@@ -241,8 +241,8 @@ async fn fetch_job_updates<'a>(
                 _ => continue,
             };
             disable_jobs(&mut scheduler, disabled_jobs);
-            let jobs = (*scheduler).jobs.clone();
-            reschedule_jobs_if_needed(&mut scheduler, last_updated_at, jobs);
+
+            reschedule_jobs_if_needed(&mut scheduler, last_updated_at);
         }
 
         //This is terrible, but for now we also check here if we are still the leader
@@ -256,11 +256,8 @@ async fn fetch_job_updates<'a>(
     }
 }
 
-fn reschedule_jobs_if_needed(
-    scheduler: &mut RwLockWriteGuard<Scheduler>,
-    last_updated_at: i64,
-    jobs: HashMap<String, Job>,
-) {
+fn reschedule_jobs_if_needed(scheduler: &mut RwLockWriteGuard<Scheduler>, last_updated_at: i64) {
+    let jobs = (*scheduler).jobs.clone();
     for (_job_name, job) in jobs {
         if job.updated_at >= last_updated_at {
             let uuid = scheduler.job_ids.remove(&job.name);
