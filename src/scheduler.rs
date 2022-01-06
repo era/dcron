@@ -188,8 +188,7 @@ fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> 
     if let Ok(mut scheduler) = scheduler.write() {
         let jobs = (*scheduler).jobs.clone();
         for (_job_name, job) in jobs {
-            let job = Arc::new(job.clone());
-            schedule_job(job, &mut *scheduler)?;
+            schedule_job(job.clone(), &mut *scheduler)?;
         }
     } else {
         return Err(anyhow::anyhow!("Could not get write lock"));
@@ -197,12 +196,12 @@ fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> 
     return Ok(());
 }
 
-fn schedule_job(job: Arc<job::Job>, scheduler: &mut Scheduler) -> Result<(), anyhow::Error> {
-    let job_name = (&*job).name.clone();
+fn schedule_job(job: job::Job, scheduler: &mut Scheduler) -> Result<(), anyhow::Error> {
+    let job_name = job.name.clone();
     let job_id = scheduler.job_scheduler.add(job_scheduler::Job::new(
         (&job.time).parse().unwrap(),
         closure!(move job, || {
-            run_job(&*job);
+            run_job(&job);
         }),
     ));
 
@@ -265,7 +264,6 @@ fn reschedule_jobs_if_needed(scheduler: &mut RwLockWriteGuard<Scheduler>, last_u
                 None => false,
             };
 
-            let job = Arc::new(job.clone());
             schedule_job(job, &mut *scheduler); //TODO should check result
         }
     }
