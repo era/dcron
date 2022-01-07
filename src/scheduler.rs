@@ -7,6 +7,7 @@ use crate::job::Job;
 use anyhow;
 use closure::closure;
 use futures::executor::ThreadPool;
+use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
@@ -172,16 +173,16 @@ async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> ! {
 
         scheduler.add_jobs(jobs);
 
-        let arc_scheduler = Arc::new(RwLock::new(scheduler));
+        let rc_scheduler = Rc::new(RwLock::new(scheduler));
 
-        schedule_all(arc_scheduler.clone()).unwrap();
+        schedule_all(rc_scheduler.clone()).unwrap();
         // This runs in a loop and only breaks if this instance is not
         // a leader anymore
-        fetch_job_updates(arc_scheduler.clone(), role.clone()).await;
+        fetch_job_updates(rc_scheduler.clone(), role.clone()).await;
     }
 }
 
-fn schedule_all(scheduler: Arc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> {
+fn schedule_all(scheduler: Rc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> {
     // Get write lock
     // Schedule all the jobs and setup jobs_id
     // meant to be run once when we start the scheduler
@@ -209,14 +210,14 @@ fn schedule_job(job: job::Job, scheduler: &mut Scheduler) -> Result<(), anyhow::
     Ok(())
 }
 
-pub fn tick(scheduler: Arc<RwLock<Scheduler>>) -> () {
+pub fn tick(scheduler: Rc<RwLock<Scheduler>>) -> () {
     if let Ok(mut scheduler) = scheduler.write() {
         (*scheduler).job_scheduler.tick();
     }
 }
 
 async fn fetch_job_updates<'a>(
-    scheduler: Arc<RwLock<Scheduler<'a>>>,
+    scheduler: Rc<RwLock<Scheduler<'a>>>,
     role: Arc<RwLock<Role>>,
 ) -> () {
     loop {
