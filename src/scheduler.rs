@@ -187,7 +187,7 @@ fn schedule_all(scheduler: Rc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> {
     // Schedule all the jobs and setup jobs_id
     // meant to be run once when we start the scheduler
     if let Ok(mut scheduler) = scheduler.write() {
-        let jobs = (*scheduler).jobs.clone();
+        let jobs = scheduler.jobs.clone();
         for (_job_name, job) in jobs {
             schedule_job(job.clone(), &mut *scheduler)?;
         }
@@ -212,7 +212,7 @@ fn schedule_job(job: job::Job, scheduler: &mut Scheduler) -> Result<(), anyhow::
 
 pub fn tick(scheduler: Rc<RwLock<Scheduler>>) -> () {
     if let Ok(mut scheduler) = scheduler.write() {
-        (*scheduler).job_scheduler.tick();
+        scheduler.job_scheduler.tick();
     }
 }
 
@@ -224,7 +224,7 @@ async fn fetch_job_updates<'a>(
         tick(scheduler.clone());
         thread::sleep(Duration::from_millis(4000));
         if let Ok(mut scheduler) = scheduler.write() {
-            let last_updated_at = (*scheduler).last_updated_at;
+            let last_updated_at = scheduler.last_updated_at;
             let disabled_jobs = match update_scheduler(&mut *scheduler).await {
                 Ok(disabled_jobs) => disabled_jobs,
                 _ => continue,
@@ -245,7 +245,7 @@ async fn fetch_job_updates<'a>(
 }
 
 fn reschedule_jobs_if_needed(scheduler: &mut Scheduler, last_updated_at: i64) {
-    let jobs = (*scheduler).jobs.clone();
+    let jobs = scheduler.jobs.clone();
     for (_job_name, job) in jobs {
         if job.updated_at > last_updated_at {
             let uuid = scheduler.job_ids.remove(&job.name);
