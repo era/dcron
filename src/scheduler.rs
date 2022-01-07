@@ -139,10 +139,9 @@ fn role_should_assume(config: Config) -> Result<Role, anyhow::Error> {
 // with different enums meaning: tick or update (probably should send NO_LEADER_ANYMORE to stop it
 // as well)
 async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> ! {
-    let db = match db::get_db(&config).await {
-        Ok(db) => db,
-        _ => panic!("Could not get DB"),
-    };
+    let db = db::get_db(&config)
+        .await
+        .expect("Could not get a Database connection");
 
     loop {
         if let Ok(role) = role.read() {
@@ -269,10 +268,10 @@ async fn update_scheduler<'a>(
 ) -> Result<Vec<job::Job>, anyhow::Error> {
     let config = &scheduler.config;
     let last_updated_at = scheduler.last_updated_at;
-    let db = match db::get_db(config).await {
-        Ok(db) => db,
-        _ => panic!("Could not get DB"),
-    };
+
+    let db = db::get_db(&config)
+        .await
+        .expect("Could not get a Database connection");
 
     let active_jobs = db.find_all_since(true, last_updated_at).await?;
     scheduler.jobs.clear();
