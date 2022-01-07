@@ -246,7 +246,7 @@ async fn fetch_job_updates<'a>(
 fn reschedule_jobs_if_needed(scheduler: &mut Scheduler, last_updated_at: i64) {
     let jobs = (*scheduler).jobs.clone();
     for (_job_name, job) in jobs {
-        if job.updated_at >= last_updated_at {
+        if job.updated_at > last_updated_at {
             let uuid = scheduler.job_ids.remove(&job.name);
             match uuid {
                 Some(uuid) => scheduler.job_scheduler.remove(uuid),
