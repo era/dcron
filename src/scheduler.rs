@@ -140,7 +140,10 @@ fn role_should_assume(config: Config) -> Result<Role, anyhow::Error> {
     });
     Ok(role)
 }
-
+//TODO split the udpates and clock tick in two threads by:
+// creating two threads that send messages (through a channel) to this one.
+// with different enums meaning: tick or update (probably should send NO_LEADER_ANYMORE to stop it
+// as well)
 async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> ! {
     let db = match db::get_db(&config).await {
         Ok(db) => db,
