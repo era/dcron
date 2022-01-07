@@ -187,10 +187,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "[::1]:50051".parse()?;
     let server = DcronBasicServer::default();
 
-    let config_file = match env::var("DCRON_CONFIG") {
-        Ok(config_file) => config_file,
-        _ => "app.toml".into(),
-    };
+    let config_file = env::var("DCRON_CONFIG").unwrap_or("app.toml".into());
 
     let config = config::Config::from(&config_file);
 

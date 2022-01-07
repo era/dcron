@@ -19,10 +19,7 @@ static CONFIG: OnceCell<config::Config> = OnceCell::new();
 // dcron-client create 1234 0 python test.py my_job
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config_file = match env::var("DCRON_CONFIG") {
-        Ok(config_file) => config_file,
-        _ => "app.toml".into(),
-    };
+    let config_file = env::var("DCRON_CONFIG").unwrap_or("app.toml".into());
 
     let config = config::Config::from(&config_file);
 

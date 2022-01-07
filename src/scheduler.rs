@@ -64,10 +64,7 @@ pub async fn main() -> () {
     // Creates the new object
     // and finally runs the Scheduler
 
-    let config_file = match env::var("DCRON_CONFIG") {
-        Ok(config_file) => config_file,
-        _ => "app.toml".into(),
-    };
+    let config_file = env::var("DCRON_CONFIG").unwrap_or("app.toml".into());
 
     let config = Config::from(&config_file);
 
