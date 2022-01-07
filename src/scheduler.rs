@@ -67,11 +67,7 @@ pub async fn main() -> () {
     let config_file = env::var("DCRON_CONFIG").unwrap_or("app.toml".into());
 
     let config = Config::from(&config_file);
-
-    let config = match config {
-        Ok(config) => config,
-        _ => panic!("Error while trying to read configuration file"),
-    };
+    let config = config.expect("Error while trying to read configuration file");
 
     let role: Arc<RwLock<Role>> = Arc::new(RwLock::new(Role::FOLLOWER));
 

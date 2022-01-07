@@ -23,10 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = config::Config::from(&config_file);
 
-    let config = match config {
-        Ok(config) => config,
-        _ => panic!("Error while trying to read configuration file"),
-    };
+    let config = config.expect("Error while trying to read configuration file");
 
     CONFIG.set(config);
 
