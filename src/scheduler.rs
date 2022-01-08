@@ -202,7 +202,7 @@ fn schedule_job(job: job::Job, scheduler: &mut Scheduler) -> Result<(), anyhow::
     Ok(())
 }
 
-pub fn tick(scheduler: Rc<RwLock<Scheduler>>) -> () {
+fn tick(scheduler: Rc<RwLock<Scheduler>>) -> () {
     if let Ok(mut scheduler) = scheduler.write() {
         scheduler.job_scheduler.tick();
     }
