@@ -156,10 +156,10 @@ async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> ! {
             continue;
         }
 
-        let jobs = match db.find_all_active().await {
-            Ok(jobs) => jobs,
-            _ => panic!("Could not initialise jobs"),
-        };
+        let jobs = db
+            .find_all_active()
+            .await
+            .expect("Could not initialise jobs");
 
         let mut scheduler = Scheduler::new(config.clone());
 
