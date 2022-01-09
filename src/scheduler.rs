@@ -165,27 +165,22 @@ async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> ! {
 
         scheduler.add_jobs(jobs);
 
-        let rc_scheduler = Rc::new(RwLock::new(scheduler));
-
-        schedule_all(rc_scheduler.clone()).unwrap();
+        schedule_all(&mut scheduler).unwrap();
         // This runs in a loop and only breaks if this instance is not
         // a leader anymore
-        fetch_job_updates(rc_scheduler.clone(), role.clone()).await;
+        fetch_job_updates(scheduler, role.clone()).await;
     }
 }
 
-fn schedule_all(scheduler: Rc<RwLock<Scheduler>>) -> Result<(), anyhow::Error> {
+fn schedule_all(scheduler: &mut Scheduler) -> Result<(), anyhow::Error> {
     // Get write lock
     // Schedule all the jobs and setup jobs_id
     // meant to be run once when we start the scheduler
-    if let Ok(mut scheduler) = scheduler.write() {
-        let jobs = scheduler.jobs.clone();
-        for (_job_name, job) in jobs {
-            schedule_job(job.clone(), &mut *scheduler)?;
-        }
-    } else {
-        return Err(anyhow::anyhow!("Could not get write lock"));
+    let jobs = scheduler.jobs.clone();
+    for (_job_name, job) in jobs {
+        schedule_job(job.clone(), &mut *scheduler)?;
     }
+
     return Ok(());
 }
 
@@ -202,29 +197,22 @@ fn schedule_job(job: job::Job, scheduler: &mut Scheduler) -> Result<(), anyhow::
     Ok(())
 }
 
-fn tick(scheduler: Rc<RwLock<Scheduler>>) -> () {
-    if let Ok(mut scheduler) = scheduler.write() {
-        scheduler.job_scheduler.tick();
-    }
+fn tick(scheduler: &mut Scheduler) -> () {
+    scheduler.job_scheduler.tick();
 }
 
-async fn fetch_job_updates<'a>(
-    scheduler: Rc<RwLock<Scheduler<'a>>>,
-    role: Arc<RwLock<Role>>,
-) -> () {
+async fn fetch_job_updates<'a>(mut scheduler: Scheduler<'a>, role: Arc<RwLock<Role>>) -> () {
     loop {
-        tick(scheduler.clone());
+        tick(&mut scheduler);
         thread::sleep(Duration::from_millis(4000));
-        if let Ok(mut scheduler) = scheduler.write() {
-            let last_updated_at = scheduler.last_updated_at;
-            let disabled_jobs = match update_scheduler(&mut *scheduler).await {
-                Ok(disabled_jobs) => disabled_jobs,
-                _ => continue,
-            };
-            disable_jobs(&mut scheduler, disabled_jobs);
+        let last_updated_at = scheduler.last_updated_at;
+        let disabled_jobs = match update_scheduler(&mut scheduler).await {
+            Ok(disabled_jobs) => disabled_jobs,
+            _ => continue,
+        };
+        disable_jobs(&mut scheduler, disabled_jobs);
 
-            reschedule_jobs_if_needed(&mut scheduler, last_updated_at);
-        }
+        reschedule_jobs_if_needed(&mut scheduler, last_updated_at);
         //This is terrible, but for now we also check here if we are still the leader
         // if not we should break and stop updating our scheduler
         if let Ok(role) = role.read() {
