@@ -234,7 +234,7 @@ fn reschedule_jobs_if_needed(scheduler: &mut Scheduler, last_updated_at: i64) {
                 None => false,
             };
 
-            schedule_job(job, &mut *scheduler); //TODO should check result
+            schedule_job(job, scheduler); //TODO should check result
         }
     }
 }
