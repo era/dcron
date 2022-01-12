@@ -13,12 +13,12 @@ pub enum DBClient {
     MongoDB(mongodb::Client),
 }
 
-pub struct DB {
+pub struct MongoDBClient {
     client: Option<DBClient>,
 }
 
 #[async_trait]
-pub trait DBTemp {
+pub trait DB {
     async fn send_heartbeat(self: &Self, server_name: &str) -> Result<(), anyhow::Error>;
 
     async fn most_recent_heartbeat(
@@ -40,7 +40,7 @@ pub trait DBTemp {
     async fn insert_if_not_exist(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>>;
 }
 
-impl DB {
+impl MongoDBClient {
     pub fn connection_url(username: &str, password: &str, cluster_url: &str) -> String {
         format!(
             "mongodb+srv://{}:{}@{}/dcron?w=majority",
@@ -88,7 +88,7 @@ impl DB {
 }
 
 #[async_trait]
-impl DBTemp for DB {
+impl DB for MongoDBClient {
     async fn send_heartbeat(self: &Self, server_name: &str) -> Result<(), anyhow::Error> {
         if let Some(database) = self.get_db() {
             let collection = database.collection("heartbeats");
@@ -198,7 +198,7 @@ impl DBTemp for DB {
 
 pub async fn get_db(
     config: &Config,
-) -> Result<Box<dyn DBTemp + std::marker::Send + Sync>, Box<dyn std::error::Error>> {
+) -> Result<Box<dyn DB + std::marker::Send + Sync>, Box<dyn std::error::Error>> {
     //TODO for now only returns mongo
     if let Some(db_config) = &config.database {
         let url = DB::connection_url(

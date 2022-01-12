@@ -1,5 +1,5 @@
 use chrono::Utc;
-use db::{DBTemp, DB};
+use db::DB;
 use dcron::public_server::{Public, PublicServer};
 use dcron::{
     DisableJobRequest, DisableJobResponse, JobRequest, JobResponse, JobStatusRequest,
@@ -172,8 +172,7 @@ impl Public for DcronBasicServer {
     }
 }
 
-async fn get_db() -> Result<Box<dyn DBTemp + std::marker::Send + Sync>, Box<dyn std::error::Error>>
-{
+async fn get_db() -> Result<Box<dyn DB + std::marker::Send + Sync>, Box<dyn std::error::Error>> {
     // TODO: Should keep a pool of connections
     let config = match CONFIG.get() {
         Some(config) => config,
