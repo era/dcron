@@ -18,9 +18,7 @@ pub struct DB {
 }
 
 #[async_trait]
-trait DBTemp {
-    async fn connect(url: String) -> Result<Box<Self>, Box<dyn std::error::Error>>;
-
+pub trait DBTemp {
     async fn send_heartbeat(self: &Self, server_name: &str) -> Result<(), anyhow::Error>;
 
     async fn most_recent_heartbeat(
@@ -41,7 +39,7 @@ trait DBTemp {
 
     async fn insert_if_not_exist(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>>;
 }
-//TODO transform this in a trait/impl
+
 impl DB {
     pub fn connection_url(username: &str, password: &str, cluster_url: &str) -> String {
         format!(
@@ -49,7 +47,11 @@ impl DB {
             username, password, cluster_url
         )
     }
-    pub async fn connect(url: String) -> Result<DB, Box<dyn std::error::Error>> {
+    pub async fn local_connection() -> Result<Self, Box<dyn std::error::Error>> {
+        DB::connect("mongodb://localhost:27017/dcron".into()).await
+    }
+
+    async fn connect(url: String) -> Result<Self, Box<dyn std::error::Error>> {
         let client_options = ClientOptions::parse(url).await?;
 
         let client = Client::with_options(client_options)?;
@@ -62,8 +64,32 @@ impl DB {
             client: Some(DBClient::MongoDB(client)),
         })
     }
+    fn get_db(self: &Self) -> Option<Database> {
+        if let Some(DBClient::MongoDB(client)) = &self.client {
+            return Some(client.database("dcron"));
+        }
+        None
+    }
+    async fn insert(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>> {
+        if let Some(database) = self.get_db() {
+            let collection = database.collection("jobs");
+            collection
+                    .insert_one(
+                        doc! { "name": &job.name, "script_type": &job.script, "script": &job.script, "time": &job.time, "timeout": &job.timeout,
+                        "updated_at": &job.updated_at},
+                        None,
+                    )
+                    .await?;
 
-    pub async fn send_heartbeat(self: &Self, server_name: &str) -> Result<(), anyhow::Error> {
+            return Ok(());
+        }
+        Err("Unknown error while saving the Job".into())
+    }
+}
+
+#[async_trait]
+impl DBTemp for DB {
+    async fn send_heartbeat(self: &Self, server_name: &str) -> Result<(), anyhow::Error> {
         if let Some(database) = self.get_db() {
             let collection = database.collection("heartbeats");
             collection
@@ -78,7 +104,7 @@ impl DB {
         Err(anyhow::anyhow!("Unknown error while saving heartbeats"))
     }
 
-    pub async fn most_recent_heartbeat(
+    async fn most_recent_heartbeat(
         self: &Self,
     ) -> Result<Option<heartbeat::Heartbeat>, anyhow::Error> {
         if let Some(database) = self.get_db() {
@@ -101,18 +127,7 @@ impl DB {
         Err(anyhow::anyhow!("Could not get a heartbeat"))
     }
 
-    pub async fn local_connection() -> Result<DB, Box<dyn std::error::Error>> {
-        DB::connect("mongodb://localhost:27017/dcron".into()).await
-    }
-
-    fn get_db(self: &Self) -> Option<Database> {
-        if let Some(DBClient::MongoDB(client)) = &self.client {
-            return Some(client.database("dcron"));
-        }
-        None
-    }
-
-    pub async fn find_job(self: &Self, name: &str, active: bool) -> Option<job::Job> {
+    async fn find_job(self: &Self, name: &str, active: bool) -> Option<job::Job> {
         if let Some(database) = self.get_db() {
             let collection = database.collection::<job::Job>("jobs");
 
@@ -127,7 +142,7 @@ impl DB {
         }
         None
     }
-    pub async fn find_all_active(self: &Self) -> Result<Vec<job::Job>, anyhow::Error> {
+    async fn find_all_active(self: &Self) -> Result<Vec<job::Job>, anyhow::Error> {
         if let Some(database) = self.get_db() {
             let collection = database.collection::<job::Job>("jobs");
             let jobs_cursor = collection.find(doc! {"active": true}, None).await?;
@@ -137,7 +152,7 @@ impl DB {
         }
     }
 
-    pub async fn find_all_since(
+    async fn find_all_since(
         self: &Self,
         active: bool,
         since: i64,
@@ -153,7 +168,7 @@ impl DB {
         }
     }
 
-    pub async fn disable_if_exist(self: &Self, name: &str) -> Result<(), Box<dyn Error>> {
+    async fn disable_if_exist(self: &Self, name: &str) -> Result<(), Box<dyn Error>> {
         if let Some(database) = self.get_db() {
             if let Some(_job) = self.find_job(name, true).await {
                 let collection: Collection<Document> = database.collection("jobs");
@@ -172,32 +187,18 @@ impl DB {
         Ok(())
     }
 
-    pub async fn insert_if_not_exist(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>> {
+    async fn insert_if_not_exist(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>> {
         if let Some(_job) = self.find_job(&job.name, true).await {
             Err("Job already in database".into())
         } else {
             self.insert(job).await
         }
     }
-
-    async fn insert(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>> {
-        if let Some(database) = self.get_db() {
-            let collection = database.collection("jobs");
-            collection
-                    .insert_one(
-                        doc! { "name": &job.name, "script_type": &job.script, "script": &job.script, "time": &job.time, "timeout": &job.timeout,
-                        "updated_at": &job.updated_at},
-                        None,
-                    )
-                    .await?;
-
-            return Ok(());
-        }
-        Err("Unknown error while saving the Job".into())
-    }
 }
 
-pub async fn get_db(config: &Config) -> Result<DB, Box<dyn std::error::Error>> {
+pub async fn get_db(
+    config: &Config,
+) -> Result<Box<dyn DBTemp + std::marker::Send + Sync>, Box<dyn std::error::Error>> {
     //TODO for now only returns mongo
     if let Some(db_config) = &config.database {
         let url = DB::connection_url(
@@ -206,8 +207,8 @@ pub async fn get_db(config: &Config) -> Result<DB, Box<dyn std::error::Error>> {
             &db_config.cluster_url,
         );
 
-        return DB::connect(url).await;
+        return Ok(Box::new(DB::connect(url).await?));
     } else {
-        return DB::local_connection().await;
+        return Ok(Box::new(DB::local_connection().await?));
     }
 }
