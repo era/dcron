@@ -1,4 +1,5 @@
 use crate::{config::Config, heartbeat, job};
+use async_trait::async_trait;
 use chrono::Utc;
 use futures_util::TryStreamExt;
 use mongodb::{
@@ -16,6 +17,30 @@ pub struct DB {
     client: Option<DBClient>,
 }
 
+#[async_trait]
+trait DBTemp {
+    async fn connect(url: String) -> Result<Box<Self>, Box<dyn std::error::Error>>;
+
+    async fn send_heartbeat(self: &Self, server_name: &str) -> Result<(), anyhow::Error>;
+
+    async fn most_recent_heartbeat(
+        self: &Self,
+    ) -> Result<Option<heartbeat::Heartbeat>, anyhow::Error>;
+
+    async fn find_job(self: &Self, name: &str, active: bool) -> Option<job::Job>;
+
+    async fn find_all_active(self: &Self) -> Result<Vec<job::Job>, anyhow::Error>;
+
+    async fn find_all_since(
+        self: &Self,
+        active: bool,
+        since: i64,
+    ) -> Result<Vec<job::Job>, anyhow::Error>;
+
+    async fn disable_if_exist(self: &Self, name: &str) -> Result<(), Box<dyn Error>>;
+
+    async fn insert_if_not_exist(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>>;
+}
 //TODO transform this in a trait/impl
 impl DB {
     pub fn connection_url(username: &str, password: &str, cluster_url: &str) -> String {
@@ -173,6 +198,7 @@ impl DB {
 }
 
 pub async fn get_db(config: &Config) -> Result<DB, Box<dyn std::error::Error>> {
+    //TODO for now only returns mongo
     if let Some(db_config) = &config.database {
         let url = DB::connection_url(
             &db_config.username,

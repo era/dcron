@@ -17,6 +17,7 @@ name="dcron-scheduler"
 path = "src/scheduler.rs"
 
 [dependencies]
+async-trait = "0.1.52"
 futures-util = "0.3.19"
 closure = "0.3.0"
 job_scheduler = "1.2.1"
