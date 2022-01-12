@@ -48,7 +48,7 @@ impl MongoDBClient {
         )
     }
     pub async fn local_connection() -> Result<Self, Box<dyn std::error::Error>> {
-        DB::connect("mongodb://localhost:27017/dcron".into()).await
+        Self::connect("mongodb://localhost:27017/dcron".into()).await
     }
 
     async fn connect(url: String) -> Result<Self, Box<dyn std::error::Error>> {
@@ -60,7 +60,7 @@ impl MongoDBClient {
             .run_command(doc! {"ping": 1}, None)
             .await?;
 
-        Ok(DB {
+        Ok(Self {
             client: Some(DBClient::MongoDB(client)),
         })
     }
@@ -201,14 +201,14 @@ pub async fn get_db(
 ) -> Result<Box<dyn DB + std::marker::Send + Sync>, Box<dyn std::error::Error>> {
     //TODO for now only returns mongo
     if let Some(db_config) = &config.database {
-        let url = DB::connection_url(
+        let url = MongoDBClient::connection_url(
             &db_config.username,
             &db_config.password,
             &db_config.cluster_url,
         );
 
-        return Ok(Box::new(DB::connect(url).await?));
+        return Ok(Box::new(MongoDBClient::connect(url).await?));
     } else {
-        return Ok(Box::new(DB::local_connection().await?));
+        return Ok(Box::new(MongoDBClient::local_connection().await?));
     }
 }
