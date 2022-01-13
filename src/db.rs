@@ -196,6 +196,7 @@ impl DB for MongoDBClient {
     }
 }
 
+//TODO: Based on the config pick other clients
 pub async fn get_db(
     config: &Config,
 ) -> Result<Box<dyn DB + std::marker::Send + Sync>, Box<dyn std::error::Error>> {
