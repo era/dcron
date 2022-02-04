@@ -95,6 +95,7 @@ fn run_health_checks(health_checks_role: Arc<RwLock<Role>>, config: Config) {
     loop {
         thread::sleep(Duration::from_millis(5000));
         pool.spawn_ok(heartbeat(config.clone()));
+        // TODO unwrap at the lock
         if let Ok(mut role) = health_checks_role.write() {
             *role = role_should_assume(config.clone()).unwrap();
         }
@@ -151,7 +152,7 @@ async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> ! {
                 Role::FOLLOWER => continue, // Nothing to do, wait until we are the leader
             };
         } else {
-            // sleep and retry later
+            //TODO lock is poisoned no point in sleeping we should stop running it
             thread::sleep(Duration::from_millis(50));
             continue;
         }
