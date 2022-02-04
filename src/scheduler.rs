@@ -96,9 +96,8 @@ fn run_health_checks(health_checks_role: Arc<RwLock<Role>>, config: Config) {
         thread::sleep(Duration::from_millis(5000));
         pool.spawn_ok(heartbeat(config.clone()));
         // TODO unwrap at the lock
-        if let Ok(mut role) = health_checks_role.write() {
-            *role = role_should_assume(config.clone()).unwrap();
-        }
+        let mut role_writer = health_checks_role.write().unwrap();
+        *role_writer = role_should_assume(config.clone()).unwrap();
     }
 }
 
@@ -145,17 +144,13 @@ async fn run_leader_scheduler(config: Config, role: Arc<RwLock<Role>>) -> ! {
         .expect("Could not get a Database connection");
 
     loop {
-        if let Ok(role) = role.read() {
-            match *role {
-                Role::LEADER => println!("Still leader"),
-                //TODO we probably can sleep after finding out we are a follower
-                Role::FOLLOWER => continue, // Nothing to do, wait until we are the leader
-            };
-        } else {
-            //TODO lock is poisoned no point in sleeping we should stop running it
-            thread::sleep(Duration::from_millis(50));
-            continue;
-        }
+        let role_reader = role.read().unwrap();
+
+        match *role_reader {
+            Role::LEADER => println!("Still leader"),
+            //TODO we probably can sleep after finding out we are a follower
+            Role::FOLLOWER => continue, // Nothing to do, wait until we are the leader
+        };
 
         let jobs = db
             .find_all_active()
@@ -216,12 +211,11 @@ async fn fetch_job_updates<'a>(mut scheduler: Scheduler<'a>, role: Arc<RwLock<Ro
         reschedule_jobs_if_needed(&mut scheduler, last_updated_at);
         //This is terrible, but for now we also check here if we are still the leader
         // if not we should break and stop updating our scheduler
-        if let Ok(role) = role.read() {
-            match *role {
-                Role::LEADER => println!("Still leader"),
-                Role::FOLLOWER => break,
-            };
-        }
+        let role_reader = role.read().unwrap();
+        match *role_reader {
+            Role::LEADER => println!("Still leader"),
+            Role::FOLLOWER => break,
+        };
     }
 }
 
