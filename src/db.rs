@@ -135,21 +135,24 @@ impl DB for MongoDBClient {
                 .find_one(doc! { "name": name, "active": active }, None)
                 .await;
 
-            match job {
-                Ok(Some(job)) => return Some(job),
-                _ => return None,
-            }
+            return match job {
+                Ok(Some(job)) => Some(job),
+                _ => None,
+            };
         }
         None
     }
     async fn find_all_active(self: &Self) -> Result<Vec<job::Job>, anyhow::Error> {
-        if let Some(database) = self.get_db() {
-            let collection = database.collection::<job::Job>("jobs");
-            let jobs_cursor = collection.find(doc! {"active": true}, None).await?;
-            return Ok(jobs_cursor.try_collect().await?);
-        } else {
-            return Err(anyhow::anyhow!("Could not connect to the database"));
-        }
+        return match self.get_db() {
+            Some(database) => {
+                let collection = database.collection::<job::Job>("jobs");
+                let jobs_cursor = collection.find(doc! {"active": true}, None).await?;
+                Ok(jobs_cursor.try_collect().await?)
+            }
+            None => {
+                Err(anyhow::anyhow!("Could not connect to the database"))
+            }
+        };
     }
 
     async fn find_all_since(
@@ -157,14 +160,17 @@ impl DB for MongoDBClient {
         active: bool,
         since: i64,
     ) -> Result<Vec<job::Job>, anyhow::Error> {
-        if let Some(database) = self.get_db() {
-            let collection = database.collection::<job::Job>("jobs");
-            let jobs_cursor = collection
-                .find(doc! {"active": active, "updated_at": {"$gt": since}}, None)
-                .await?;
-            return Ok(jobs_cursor.try_collect().await?);
-        } else {
-            return Err(anyhow::anyhow!("Could not connect to the database"));
+        match self.get_db() {
+            Some(database) => {
+                let collection = database.collection::<job::Job>("jobs");
+                let jobs_cursor = collection
+                    .find(doc! {"active": active, "updated_at": {"$gt": since}}, None)
+                    .await?;
+                Ok(jobs_cursor.try_collect().await?)
+            }
+            None => {
+                Err(anyhow::anyhow!("Could not connect to the database"))
+            }
         }
     }
 
@@ -208,8 +214,8 @@ pub async fn get_db(
             &db_config.cluster_url,
         );
 
-        return Ok(Box::new(MongoDBClient::connect(url).await?));
+        Ok(Box::new(MongoDBClient::connect(url).await?))
     } else {
-        return Ok(Box::new(MongoDBClient::local_connection().await?));
+        Ok(Box::new(MongoDBClient::local_connection().await?))
     }
 }
