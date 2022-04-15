@@ -130,7 +130,7 @@ async fn get_job(matches: &ArgMatches<'_>) -> Result<(), Box<dyn std::error::Err
         name: matches.value_of("name").unwrap().into(),
     });
 
-    let response = client.await?.get_job(request).await?;
+    let response = client.await.unwrap().get_job(request).await.unwrap();
 
     println!("RESPONSE={:?}", response);
 
@@ -143,7 +143,7 @@ async fn disable_job(matches: &ArgMatches<'_>) -> Result<(), Box<dyn std::error:
         name: matches.value_of("name").unwrap().into(),
     });
 
-    let response = client.await?.disable_job(request).await?;
+    let response = client.await.unwrap().disable_job(request).await.unwrap();
 
     println!("RESPONSE={:?}", response);
 
@@ -155,7 +155,7 @@ async fn create_job(matches: &ArgMatches<'_>) -> Result<(), Box<dyn std::error::
 
     let mut client = PublicClient::connect("http://[::1]:50051"); //TODO: change with ENV variables
 
-    let file = upload_file(file).await?;
+    let file = upload_file(file).await.unwrap();
 
     let request = tonic::Request::new(JobRequest {
         name: matches.value_of("name").unwrap().into(),
@@ -166,7 +166,7 @@ async fn create_job(matches: &ArgMatches<'_>) -> Result<(), Box<dyn std::error::
         job_type: job_type(matches.value_of("type").unwrap()),
     });
 
-    let response = client.await?.new_job(request).await?;
+    let response = client.await.unwrap().new_job(request).await.unwrap();
 
     println!("RESPONSE={:?}", response);
 
@@ -181,10 +181,11 @@ fn job_type(user_type: &str) -> i32 {
     }
 }
 
-async fn upload_file(path: &Path) -> Result<String, anyhow::Error> {
+async fn upload_file(path: &Path) -> Result<String, storage::Error> {
     let config = match CONFIG.get() {
         Some(config) => config,
-        _ => return Err(anyhow::anyhow!("Could not get a config object")),
+        //TODO do not do this
+        _ => return Err(storage::Error{message: "Could not get a config object".into()}),
     };
 
     let minio_config = match &config.minio {
