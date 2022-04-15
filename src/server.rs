@@ -160,11 +160,12 @@ impl Public for DcronBasicServer {
     }
 }
 
-async fn get_db() -> Result<Box<dyn DB + std::marker::Send + Sync>, Box<dyn std::error::Error>> {
+async fn get_db() -> Result<Box<dyn DB + std::marker::Send + Sync>, db::DBError> {
     // TODO: Should keep a pool of connections
     let config = match CONFIG.get() {
         Some(config) => config,
-        _ => return Err("Could not get a config object".into()),
+        //TODO change this error
+        _ => return Err(db::DBError{message: "Could not get a config object".into()}),
     };
 
     db::get_db(config).await

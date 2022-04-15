@@ -9,6 +9,10 @@ use mongodb::{
 };
 use std::error::Error;
 
+#[derive(Debug)]
+pub struct DBError {
+    pub message: String,
+}
 pub enum DBClient {
     MongoDB(mongodb::Client),
 }
@@ -205,7 +209,7 @@ impl DB for MongoDBClient {
 //TODO: Based on the config pick other clients
 pub async fn get_db(
     config: &Config,
-) -> Result<Box<dyn DB + std::marker::Send + Sync>, Box<dyn std::error::Error>> {
+) -> Result<Box<dyn DB + std::marker::Send + Sync>, DBError> {
     //TODO for now only returns mongo
     if let Some(db_config) = &config.database {
         let url = MongoDBClient::connection_url(
@@ -214,8 +218,16 @@ pub async fn get_db(
             &db_config.cluster_url,
         );
 
-        Ok(Box::new(MongoDBClient::connect(url).await?))
+        match MongoDBClient::connect(url).await {
+            Ok(c) => Ok(Box::new(c)),
+            Err(e) => Err(DBError{message: e.to_string()})
+        }
+
+
     } else {
-        Ok(Box::new(MongoDBClient::local_connection().await?))
+        match MongoDBClient::local_connection().await {
+            Ok(c) => Ok(Box::new(c)),
+            Err(e) => Err(DBError{message: e.to_string()})
+        }
     }
 }
