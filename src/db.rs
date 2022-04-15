@@ -23,15 +23,15 @@ pub struct MongoDBClient {
 
 #[async_trait]
 pub trait DB {
-    async fn send_heartbeat(self: &Self, server_name: &str) -> Result<(), anyhow::Error>;
+    async fn send_heartbeat(self: &Self, server_name: &str) -> Result<(), DBError>;
 
     async fn most_recent_heartbeat(
         self: &Self,
-    ) -> Result<Option<heartbeat::Heartbeat>, anyhow::Error>;
+    ) -> Result<Option<heartbeat::Heartbeat>, DBError>;
 
     async fn find_job(self: &Self, name: &str, active: bool) -> Option<job::Job>;
 
-    async fn find_all_active(self: &Self) -> Result<Vec<job::Job>, anyhow::Error>;
+    async fn find_all_active(self: &Self) -> Result<Vec<job::Job>, DBError>;
 
     async fn find_all_since(
         self: &Self,
@@ -39,9 +39,9 @@ pub trait DB {
         since: i64,
     ) -> Result<Vec<job::Job>, anyhow::Error>;
 
-    async fn disable_if_exist(self: &Self, name: &str) -> Result<(), Box<dyn Error>>;
+    async fn disable_if_exist(self: &Self, name: &str) -> Result<(), DBError>;
 
-    async fn insert_if_not_exist(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>>;
+    async fn insert_if_not_exist(self: &Self, job: &job::Job) -> Result<(), DBError>;
 }
 
 impl MongoDBClient {
@@ -74,43 +74,45 @@ impl MongoDBClient {
         }
         None
     }
-    async fn insert(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>> {
+    async fn insert(self: &Self, job: &job::Job) -> Result<(), DBError> {
         if let Some(database) = self.get_db() {
             let collection = database.collection("jobs");
-            collection
+            return match collection
                     .insert_one(
                         doc! { "name": &job.name, "script_type": &job.script, "script": &job.script, "time": &job.time, "timeout": &job.timeout,
                         "updated_at": &job.updated_at},
                         None,
                     )
-                    .await?;
-
-            return Ok(());
+                    .await {
+                Ok(_) => Ok(()),
+                Err(e) => Err(DBError{message: e.to_string()})
+            };
         }
-        Err("Unknown error while saving the Job".into())
+        Err(DBError{message: "Unknown error while saving the Job".into()})
     }
 }
 
 #[async_trait]
 impl DB for MongoDBClient {
-    async fn send_heartbeat(self: &Self, server_name: &str) -> Result<(), anyhow::Error> {
+    async fn send_heartbeat(self: &Self, server_name: &str) -> Result<(), DBError> {
         if let Some(database) = self.get_db() {
             let collection = database.collection("heartbeats");
-            collection
+            return match collection
                 .insert_one(
                     doc! { "server": server_name, "timestamp": Utc::now().timestamp()},
                     None,
                 )
-                .await?;
-
-            return Ok(());
+                .await {
+                Ok(_) => Ok(()),
+                Err(e) => Err(DBError{message: e.to_string()})
+            };
         }
-        Err(anyhow::anyhow!("Unknown error while saving heartbeats"))
+        Err(DBError{message: "Unknown error while saving heartbeats".into()})
     }
 
     async fn most_recent_heartbeat(
         self: &Self,
-    ) -> Result<Option<heartbeat::Heartbeat>, anyhow::Error> {
+    ) -> Result<Option<heartbeat::Heartbeat>, DBError> {
         if let Some(database) = self.get_db() {
             let collection = database.collection::<heartbeat::Heartbeat>("heartbeats");
             let since = Utc::now().timestamp() - 30000;
@@ -123,12 +125,12 @@ impl DB for MongoDBClient {
                 )
                 .await;
 
-            match hb {
-                Ok(Some(hb)) => return Ok(Some(hb)),
-                _ => return Ok(None),
+            return match hb {
+                Ok(Some(hb)) => Ok(Some(hb)),
+                _ => Ok(None),
             }
         }
-        Err(anyhow::anyhow!("Could not get a heartbeat"))
+        Err(DBError{message: "Could not get a heartbeat".to_string()})
     }
 
     async fn find_job(self: &Self, name: &str, active: bool) -> Option<job::Job> {
@@ -146,15 +148,25 @@ impl DB for MongoDBClient {
         }
         None
     }
-    async fn find_all_active(self: &Self) -> Result<Vec<job::Job>, anyhow::Error> {
+    async fn find_all_active(self: &Self) -> Result<Vec<job::Job>, DBError> {
         return match self.get_db() {
             Some(database) => {
                 let collection = database.collection::<job::Job>("jobs");
-                let jobs_cursor = collection.find(doc! {"active": true}, None).await?;
-                Ok(jobs_cursor.try_collect().await?)
+                let jobs_cursor = collection.find(doc! {"active": true}, None).await;
+
+                let result = match jobs_cursor {
+                    Ok(jobs_cursor) => jobs_cursor.try_collect().await,
+                    Err(e) => return Err(DBError{message: e.to_string()}),
+                };
+
+                match result {
+                    Ok(result) => Ok(result),
+                    Err(e) => Err(DBError{message: e.to_string()})
+                }
+
             }
             None => {
-                Err(anyhow::anyhow!("Could not connect to the database"))
+                Err(DBError{message: "Could not connect to the database".to_string()})
             }
         };
     }
@@ -178,28 +190,30 @@ impl DB for MongoDBClient {
         }
     }
 
-    async fn disable_if_exist(self: &Self, name: &str) -> Result<(), Box<dyn Error>> {
+    async fn disable_if_exist(self: &Self, name: &str) -> Result<(), DBError> {
         if let Some(database) = self.get_db() {
             if let Some(_job) = self.find_job(name, true).await {
                 let collection: Collection<Document> = database.collection("jobs");
-                collection
+                return match collection
                     .update_one(
                         doc! {"name": name, "active": true},
                         doc! {"active": false, "updated_at": Utc::now().timestamp()},
                         None,
                     )
-                    .await?;
-                return Ok(());
+                    .await {
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(DBError{message: e.to_string()})
+                };
             }
         } else {
-            return Err("Could not get the database object".into());
+            return Err(DBError{message: "Could not get the database object".to_string()});
         }
         Ok(())
     }
 
-    async fn insert_if_not_exist(self: &Self, job: &job::Job) -> Result<(), Box<dyn Error>> {
+    async fn insert_if_not_exist(self: &Self, job: &job::Job) -> Result<(), DBError> {
         if let Some(_job) = self.find_job(&job.name, true).await {
-            Err("Job already in database".into())
+            Err(DBError{message: "Job already in database".into()})
         } else {
             self.insert(job).await
         }
