@@ -102,12 +102,6 @@ impl Public for DcronBasicServer {
                     "Error while trying to get object",
                 ))
             }
-            _ => {
-                return Err(Status::new(
-                    Code::Internal,
-                    "Error while trying to get object",
-                ))
-            }
         };
 
         let reply = dcron::JobStatusResponse {
