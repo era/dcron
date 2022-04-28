@@ -7,7 +7,6 @@ use crate::job::Job;
 use anyhow;
 use closure::closure;
 use futures::executor::ThreadPool;
-use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
@@ -103,7 +102,9 @@ fn run_health_checks(health_checks_role: Arc<RwLock<Role>>, config: Config) {
 
 async fn heartbeat(config: Config) {
     if let Ok(db) = db::get_db(&config).await {
-        db.send_heartbeat(&server_name());
+        if let Err(db_error) = db.send_heartbeat(&server_name()).await {
+            println!("failed to send heartbeat: {:?}", db_error)
+        }
     } else {
         println!("Could not send heartbeat");
     }

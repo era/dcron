@@ -3,7 +3,7 @@ use db::DB;
 use dcron::public_server::{Public, PublicServer};
 use dcron::{
     DisableJobRequest, DisableJobResponse, JobRequest, JobResponse, JobStatusRequest,
-    JobStatusResponse, ScriptType,
+    JobStatusResponse,
 };
 use once_cell::sync::OnceCell;
 use std::env;
@@ -181,7 +181,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = config::Config::from(&config_file);
     let config = config.expect("Error while trying to read configuration file");
 
-    CONFIG.set(config);
+    CONFIG.set(config).expect("could not set configuration");
 
     Server::builder()
         .add_service(PublicServer::new(server))
