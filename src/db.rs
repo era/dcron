@@ -7,7 +7,6 @@ use mongodb::{
     options::ClientOptions,
     Client, Collection, Database,
 };
-use std::error::Error;
 
 #[derive(Debug)]
 pub struct DBError {
