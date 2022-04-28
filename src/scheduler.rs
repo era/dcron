@@ -103,7 +103,7 @@ fn run_health_checks(health_checks_role: Arc<RwLock<Role>>, config: Config) {
 async fn heartbeat(config: Config) {
     if let Ok(db) = db::get_db(&config).await {
         if let Err(db_error) = db.send_heartbeat(&server_name()).await {
-            println!("failed to send heartbeat: {:?}", db_error)
+            println!("failed to send heartbeat: {:?}", db_error);
         }
     } else {
         println!("Could not send heartbeat");
@@ -186,7 +186,9 @@ fn schedule_job(job: job::Job, scheduler: &mut Scheduler) -> Result<(), anyhow::
     let job_id = scheduler.job_scheduler.add(job_scheduler::Job::new(
         (&job.time).parse().unwrap(),
         closure!(move job, || {
-            run_job(&job);
+            if let Err(err) = run_job(&job) {
+                println!("error while running job {:?}, {:?}", &job, err);
+            }
         }),
     ));
 
@@ -230,7 +232,9 @@ fn reschedule_jobs_if_needed(scheduler: &mut Scheduler, last_updated_at: i64) {
                 None => false,
             };
 
-            schedule_job(job, scheduler); //TODO should check result
+            if let Err(err) = schedule_job(job, scheduler) {
+                println!("error while scheduling job err: {:?}", err)
+            }
         }
     }
 }

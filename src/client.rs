@@ -4,7 +4,6 @@ use dcron::public_client::PublicClient;
 use dcron::{DisableJobRequest, JobRequest, JobStatusRequest, ScriptType};
 use once_cell::sync::OnceCell;
 use std::env;
-use std::ops::Sub;
 use std::path::Path;
 use std::str::FromStr;
 
@@ -25,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = config.expect("Error while trying to read configuration file");
 
-    CONFIG.set(config);
+    CONFIG.set(config).expect("could not set configuration");
 
     let matches = App::new("dcron_client")
         .version("0.0.1")
@@ -125,7 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn get_job(matches: &ArgMatches<'_>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = PublicClient::connect("http://[::1]:50051");
+    let client = PublicClient::connect("http://[::1]:50051");
     let request = tonic::Request::new(JobStatusRequest {
         name: matches.value_of("name").unwrap().into(),
     });
@@ -138,7 +137,7 @@ async fn get_job(matches: &ArgMatches<'_>) -> Result<(), Box<dyn std::error::Err
 }
 
 async fn disable_job(matches: &ArgMatches<'_>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = PublicClient::connect("http://[::1]:50051");
+    let client = PublicClient::connect("http://[::1]:50051");
     let request = tonic::Request::new(DisableJobRequest {
         name: matches.value_of("name").unwrap().into(),
     });
@@ -153,7 +152,7 @@ async fn disable_job(matches: &ArgMatches<'_>) -> Result<(), Box<dyn std::error:
 async fn create_job(matches: &ArgMatches<'_>) -> Result<(), Box<dyn std::error::Error>> {
     let file = Path::new(matches.value_of("script").unwrap());
 
-    let mut client = PublicClient::connect("http://[::1]:50051"); //TODO: change with ENV variables
+    let client = PublicClient::connect("http://[::1]:50051"); //TODO: change with ENV variables
 
     let file = upload_file(file).await.unwrap();
 
